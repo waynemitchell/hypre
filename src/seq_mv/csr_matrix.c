@@ -15,9 +15,8 @@
  * Member functions for hypre_CSRMatrix class.
  *
  *****************************************************************************/
-
+#define USE_NVTX 1
 #include "seq_mv.h"
-
 #ifdef HYPRE_PROFILE
 HYPRE_Real hypre_profile_times[HYPRE_TIMER_ID_COUNT] = { 0 };
 #endif
@@ -46,7 +45,9 @@ hypre_CSRMatrixCreate( HYPRE_Int num_rows,
    /* set defaults */
    hypre_CSRMatrixOwnsData(matrix) = 1;
    hypre_CSRMatrixNumRownnz(matrix) = num_rows;
-
+#ifdef HYPRE_USE_CUDA
+   hypre_CSRMatrixDevice(matrix) = NULL;
+#endif
 
    return matrix;
 }
@@ -61,6 +62,10 @@ hypre_CSRMatrixDestroy( hypre_CSRMatrix *matrix )
 
    if (matrix)
    {
+     
+#ifdef HYPRE_USE_CUDA
+     cuda_VectorDestroy(matrix);
+#endif
       hypre_TFree(hypre_CSRMatrixI(matrix));
       hypre_CSRMatrixI(matrix)    = NULL;
       if (hypre_CSRMatrixRownnz(matrix))
@@ -670,3 +675,109 @@ HYPRE_Int hypre_CSRMatrixGetLoadBalancedPartitionEnd(hypre_CSRMatrix *A)
 {
    return hypre_CSRMatrixGetLoadBalancedPartitionBoundary(A, hypre_GetThreadNum() + 1);
 }
+
+#ifdef HYPRE_USE_CUDA
+  
+void hypre_CSRMatrixMapToDevice(hypre_CSRMatrix *A){
+  
+  if (hypre_CSRMatrixDevice(A)!=NULL){
+    printf("ERROR:: Trying to map an already mapped file\n");
+  }
+
+  
+  // Allocate memory for the struct for holding all the device pointers
+  if (hypre_CSRMatrixDevice(A)==NULL) {
+    hypre_CSRMatrixDevice(A)=hypre_CTAlloc(cuda_CSRMatrix, 1);
+    hypre_CSRMatrixDataDevice(A)=NULL;
+    hypre_CSRMatrixIDevice(A)=NULL;
+    hypre_CSRMatrixJDevice(A)=NULL;
+    hypre_CSRMatrixCopiedToDevice(A)=0;
+  }
+
+  // Get a cuSPARSE handle 
+  cusparseStatus_t status;
+  status= cusparseCreate(&(hypre_CSRMatrixHandle(A)));
+  if (status != CUSPARSE_STATUS_SUCCESS) {
+    printf("ERROR:: CUSPARSE Library initialization failed\n");
+    hypre_CSRMatrixHandle(A)=0;
+  } 
+  // Create and Set Matrix Desciptor
+  status= cusparseCreateMatDescr(&(hypre_CSRMatrixDescr(A))); 
+  if (status != CUSPARSE_STATUS_SUCCESS) {
+    printf("ERROR:: Matrix descriptor initialization failed\n");
+    //cudaDeviceReset();
+    //return 1;
+  } 
+  cusparseSetMatType(hypre_CSRMatrixDescr(A),CUSPARSE_MATRIX_TYPE_GENERAL);
+  cusparseSetMatIndexBase(hypre_CSRMatrixDescr(A),CUSPARSE_INDEX_BASE_ZERO);
+
+  
+  // Allocate device memory for Data and row and column vectors
+  HYPRE_Int  num_rows     = hypre_CSRMatrixNumRows(A);
+  HYPRE_Int  num_nonzeros = hypre_CSRMatrixNumNonzeros(A);
+  
+  if ( ! hypre_CSRMatrixDataDevice(A) && num_nonzeros ){
+    gpuErrchk(cudaMalloc((void**)&(hypre_CSRMatrixDataDevice(A)),num_nonzeros*sizeof(HYPRE_Complex)));
+  } 
+  
+
+  if ( ! hypre_CSRMatrixIDevice(A) ){
+    gpuErrchk(cudaMalloc((void**)&hypre_CSRMatrixIDevice(A),(num_rows+1)*sizeof(HYPRE_Int)));
+    
+  }
+
+  if ( ! hypre_CSRMatrixJDevice(A) && num_nonzeros ){
+    gpuErrchk(cudaMalloc((void**)&hypre_CSRMatrixJDevice(A),(num_nonzeros)*sizeof(HYPRE_Int)));
+  }
+
+}
+
+// Some copy routines. Probably needs to be in a separate standalone file
+
+
+void hypre_CSRMatrixH2D(hypre_CSRMatrix *matrix){
+ 
+  hypre_CSRMatrixDataH2D(matrix);
+  hypre_CSRMatrixIH2D(matrix);
+  hypre_CSRMatrixJH2D(matrix);
+  
+ }
+  
+void hypre_CSRMatrixDataH2D(hypre_CSRMatrix *matrix){
+  PUSH_RANGE("MatDataSend",0);
+  gpuErrchk(cudaMemcpy(hypre_CSRMatrixDataDevice(matrix),hypre_CSRMatrixData(matrix), 
+			(size_t)(matrix->num_nonzeros*sizeof(HYPRE_Complex)), 
+			cudaMemcpyHostToDevice));
+  POP_RANGE;
+}
+
+void hypre_CSRMatrixIH2D(hypre_CSRMatrix *matrix){
+  PUSH_RANGE("MatISend",1);
+  gpuErrchk(cudaMemcpy(hypre_CSRMatrixIDevice(matrix), hypre_CSRMatrixI(matrix),
+		       (size_t)((matrix->num_rows+1)*sizeof(HYPRE_Int)), 
+		       cudaMemcpyHostToDevice));
+  POP_RANGE;
+}
+
+void hypre_CSRMatrixJH2D(hypre_CSRMatrix *matrix){
+  PUSH_RANGE("MatJSend",2);
+  gpuErrchk(cudaMemcpy(hypre_CSRMatrixJDevice(matrix),hypre_CSRMatrixJ(matrix),
+		       (size_t)(matrix->num_nonzeros*sizeof(HYPRE_Int)), 
+		       cudaMemcpyHostToDevice));
+  POP_RANGE;
+}
+
+
+void cuda_VectorDestroy(hypre_CSRMatrix *matrix){
+  if (hypre_CSRMatrixDevice(matrix)){
+    //printf("Destorying CSR matrix on ccuda %d \n",hypre_CSRMatrixNumNonzeros(matrix));
+    gpuErrchk(cudaFree(hypre_CSRMatrixDataDevice(matrix)));
+    gpuErrchk(cudaFree(hypre_CSRMatrixIDevice(matrix)));
+    gpuErrchk(cudaFree(hypre_CSRMatrixJDevice(matrix)));
+    gpuErrchk(cusparseDestroyMatDescr(hypre_CSRMatrixDescr(matrix)));
+    gpuErrchk(cusparseDestroy(hypre_CSRMatrixHandle(matrix)));
+    hypre_TFree(hypre_CSRMatrixDevice(matrix));
+    hypre_CSRMatrixDevice(matrix)=NULL;
+  }
+}
+#endif

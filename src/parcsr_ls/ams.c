@@ -13,7 +13,7 @@
 
 
 
-
+#define USE_NVTX 1
 #include "_hypre_parcsr_ls.h"
 #include "float.h"
 #include "ams.h"
@@ -65,19 +65,21 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
    HYPRE_Real *u_data = hypre_VectorData(hypre_ParVectorLocalVector(u));
    HYPRE_Real *f_data = hypre_VectorData(hypre_ParVectorLocalVector(f));
    HYPRE_Real *v_data = hypre_VectorData(hypre_ParVectorLocalVector(v));
-
+   //printf("Sweep count %d\n",relax_times);
    for (sweep = 0; sweep < relax_times; sweep++)
    {
       if (relax_type == 1) /* l1-scaled Jacobi */
       {
+	PUSH_RANGE("L1-SJacobi",0);
          HYPRE_Int i, num_rows = hypre_ParCSRMatrixNumRows(A);
-
+	 //printf("Relaxing here \n");
          hypre_ParVectorCopy(f,v);
          hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
 
          /* u += w D^{-1}(f - A u), where D_ii = ||A(i,:)||_1 */
          for (i = 0; i < num_rows; i++)
             u_data[i] += v_data[i] / l1_norms[i];
+	 POP_RANGE
       }
       else if (relax_type == 2 || relax_type == 4) /* offd-l1-scaled block GS */
       {

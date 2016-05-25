@@ -15,7 +15,7 @@
  * Matvec functions for hypre_CSRMatrix class.
  *
  *****************************************************************************/
-
+#define USE_NVTX 1
 #include "seq_mv.h"
 #include <assert.h>
 
@@ -33,6 +33,16 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
                                  hypre_Vector    *y,
                                  HYPRE_Int        offset     )
 {
+
+#ifdef HYPRE_USE_CUDA
+
+#define CUDA_MATVEC_CUTOFF 1000000						
+  if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
+    return hypre_CSRMatrixMatvecOutOfPlaceDevice(alpha,A,x,beta,b,y,offset);
+
+#endif
+
+
 #ifdef HYPRE_PROFILE
    HYPRE_Real time_begin = hypre_MPI_Wtime();
 #endif
@@ -82,7 +92,8 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
     *  these conditions terminates processing, and the ierr flag
     *  is informational only.
     *--------------------------------------------------------------------*/
- 
+   //if (y!=b) printf("Ye Olde Matvec call %d\n",offset);
+   //else printf("OFFSET Matvec call %d\n",offset);
    hypre_assert( num_vectors == hypre_VectorNumVectors(y) );
    hypre_assert( num_vectors == hypre_VectorNumVectors(b) );
 
@@ -410,7 +421,16 @@ hypre_CSRMatrixMatvec( HYPRE_Complex    alpha,
                        HYPRE_Complex    beta,
                        hypre_Vector    *y     )
 {
-   return hypre_CSRMatrixMatvecOutOfPlace(alpha, A, x, beta, y, y, 0);
+#ifndef HYPRE_USE_CUDA
+  return hypre_CSRMatrixMatvecOutOfPlace(alpha, A, x, beta, y, y, 0);
+#else
+  PUSH_RANGE("Matvec",4);
+  if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
+    return hypre_CSRMatrixMatvecDevice(alpha,A,x,beta,y);
+  else
+    return hypre_CSRMatrixMatvecOutOfPlace(alpha, A, x, beta, y, y, 0);
+  POP_RANGE;
+#endif
 }
 
 /*--------------------------------------------------------------------------
@@ -760,3 +780,218 @@ hypre_CSRMatrixMatvec_FF( HYPRE_Complex    alpha,
 
    return ierr;
 }
+
+
+
+#ifdef HYPRE_USE_CUDA
+HYPRE_Int
+hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
+                       hypre_CSRMatrix *A,
+                       hypre_Vector    *x,
+                       HYPRE_Complex    beta,
+                       hypre_Vector    *y     ){
+  //printf("Entre hypre_CSRMatrixMatvec CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
+  //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
+  if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
+  if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
+  if (!hypre_VectorDevice(y)) hypre_VectorMapToDevice(y);
+  // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
+  
+  if (!hypre_CSRMatrixCopiedToDevice(A)){
+    hypre_CSRMatrixH2D(A);
+    hypre_CSRMatrixCopiedToDevice(A)=1;
+#ifdef HYPRE_USE_CUDA_HYB
+    //printf("Preparing to convert to hyb format\n");
+    cusparseStatus_t ct;
+    ct=cusparseCreateHybMat(&(A->hybA));
+    if (ct != CUSPARSE_STATUS_SUCCESS) {
+      printf("Creation of A->hybA failed ");
+      cudaDeviceReset();
+      return 1;
+    } //else printf("Creation of A-<hybA succeeded\n");
+    
+    ct=cusparseDcsr2hyb(A->handle,A->num_rows,A->num_cols,A->descr,A->data_device, A->i_device, A->j_device,
+			A->hybA,10,
+			CUSPARSE_HYB_PARTITION_AUTO);
+    cudaDeviceSynchronize();
+    if (ct != CUSPARSE_STATUS_SUCCESS) {
+      printf("Conversion to hybrid format failed ");
+      cudaDeviceReset();
+      return 1;
+    }// else printf("Conversion to hybrid format succeeded\n");
+#endif
+    // WARNING:: assumes that A is static and doesnot change 
+  }
+  hypre_VectorH2D(x);
+  hypre_VectorH2D(y);
+  cusparseStatus_t status;
+#ifndef HYPRE_USE_CUDA_HYB
+  status= cusparseDcsrmv(hypre_CSRMatrixHandle(A) ,
+			 CUSPARSE_OPERATION_NON_TRANSPOSE, 
+			 A->num_rows, A->num_cols, A->num_nonzeros,
+  			 &alpha, hypre_CSRMatrixDescr(A),
+			 hypre_CSRMatrixDataDevice(A) ,hypre_CSRMatrixIDevice(A),hypre_CSRMatrixJDevice(A),
+  			 hypre_VectorDataDevice(x), &beta, hypre_VectorDataDevice(y));
+  
+  if (status != CUSPARSE_STATUS_SUCCESS) {
+    printf("Matrix-vector multiplication failed");
+    cudaDeviceReset();
+    return 1;
+  } else //printf("SXS SpMV done\n");
+  
+#else
+    status= cusparseDhybmv(A->handle,CUSPARSE_OPERATION_NON_TRANSPOSE,
+  			 &alpha, A->descr, A->hybA, 
+  			 &x->data_device[0], &beta, &y->data_device[0]);
+  
+  if (status != CUSPARSE_STATUS_SUCCESS) {
+    printf("Matrix-vector multiplication using cusparseDhybmv failed");
+    cudaDeviceReset();
+    return 1;
+  } else //printf("SXS SpMV done\n");
+#endif
+  cudaDeviceSynchronize();
+  //HYPRE_Complex prenorm = hypre_VectorNorm(y);
+  hypre_VectorD2H(y);
+  //printf("Pre & Post Norm of solution is %lf -> %lf\n",prenorm,hypre_VectorNorm(y));
+}
+
+HYPRE_Int
+hypre_CSRMatrixMatvecOutOfPlaceDevice( HYPRE_Complex    alpha,
+                                 hypre_CSRMatrix *A,
+                                 hypre_Vector    *x,
+                                 HYPRE_Complex    beta,
+                                 hypre_Vector    *b,
+                                 hypre_Vector    *y,
+                                 HYPRE_Int        offset     )
+{
+
+
+   HYPRE_Complex    *A_data   = hypre_CSRMatrixData(A);
+   HYPRE_Int        *A_i      = hypre_CSRMatrixI(A) + offset;
+   HYPRE_Int        *A_j      = hypre_CSRMatrixJ(A);
+   HYPRE_Int         num_rows = hypre_CSRMatrixNumRows(A) - offset;
+   HYPRE_Int         num_cols = hypre_CSRMatrixNumCols(A);
+   /*HYPRE_Int         num_nnz  = hypre_CSRMatrixNumNonzeros(A);*/
+
+   HYPRE_Int        *A_rownnz = hypre_CSRMatrixRownnz(A);
+   HYPRE_Int         num_rownnz = hypre_CSRMatrixNumRownnz(A);
+
+   HYPRE_Complex    *x_data = hypre_VectorData(x);
+   HYPRE_Complex    *b_data = hypre_VectorData(b) + offset;
+   HYPRE_Complex    *y_data = hypre_VectorData(y);
+   HYPRE_Int         x_size = hypre_VectorSize(x);
+   HYPRE_Int         b_size = hypre_VectorSize(b) - offset;
+   HYPRE_Int         y_size = hypre_VectorSize(y) - offset;
+   HYPRE_Int         num_vectors = hypre_VectorNumVectors(x);
+   HYPRE_Int         idxstride_y = hypre_VectorIndexStride(y);
+   HYPRE_Int         vecstride_y = hypre_VectorVectorStride(y);
+   /*HYPRE_Int         idxstride_b = hypre_VectorIndexStride(b);
+   HYPRE_Int         vecstride_b = hypre_VectorVectorStride(b);*/
+   HYPRE_Int         idxstride_x = hypre_VectorIndexStride(x);
+   HYPRE_Int         vecstride_x = hypre_VectorVectorStride(x);
+
+   HYPRE_Complex     temp, tempx;
+
+   HYPRE_Int         i, j, jj;
+
+   HYPRE_Int         m;
+
+   HYPRE_Real        xpar=0.7;
+
+   HYPRE_Int         ierr = 0;
+   hypre_Vector	    *x_tmp = NULL;
+
+   /*---------------------------------------------------------------------
+    *  Check for size compatibility.  Matvec returns ierr = 1 if
+    *  length of X doesn't equal the number of columns of A,
+    *  ierr = 2 if the length of Y doesn't equal the number of rows
+    *  of A, and ierr = 3 if both are true.
+    *
+    *  Because temporary vectors are often used in Matvec, none of 
+    *  these conditions terminates processing, and the ierr flag
+    *  is informational only.
+    *--------------------------------------------------------------------*/
+   //if (y!=b) printf("Ye Olde Matvec call %d\n",offset);
+   //else printf("OFFSET Matvec call %d\n",offset);
+   hypre_assert( num_vectors == hypre_VectorNumVectors(y) );
+   hypre_assert( num_vectors == hypre_VectorNumVectors(b) );
+
+   if (num_cols != x_size)
+      ierr = 1;
+
+   if (num_rows != y_size || num_rows != b_size)
+      ierr = 2;
+
+   if (num_cols != x_size && (num_rows != y_size || num_rows != b_size))
+      ierr = 3;
+
+   //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
+   //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
+   if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
+   if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
+   if (!hypre_VectorDevice(b)) hypre_VectorMapToDevice(b);
+  // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
+  
+   if (!hypre_CSRMatrixCopiedToDevice(A)){
+    hypre_CSRMatrixH2D(A);
+    hypre_CSRMatrixCopiedToDevice(A)=1;
+#ifdef HYPRE_USE_CUDA_HYB
+    //printf("Preparing to convert to hyb format\n");
+    cusparseStatus_t ct;
+    ct=cusparseCreateHybMat(&(A->hybA));
+    if (ct != CUSPARSE_STATUS_SUCCESS) {
+      printf("Creation of A->hybA failed ");
+      cudaDeviceReset();
+      return 1;
+    } //else printf("Creation of A-<hybA succeeded\n");
+    
+    ct=cusparseDcsr2hyb(A->handle,A->num_rows,A->num_cols,A->descr,A->data_device, A->i_device, A->j_device,
+			A->hybA,10,
+			CUSPARSE_HYB_PARTITION_AUTO);
+    cudaDeviceSynchronize();
+    if (ct != CUSPARSE_STATUS_SUCCESS) {
+      printf("Conversion to hybrid format failed ");
+      cudaDeviceReset();
+      return 1;
+    }// else printf("Conversion to hybrid format succeeded\n");
+#endif
+    // WARNING:: assumes that A is static and doesnot change 
+  }
+  hypre_VectorH2D(x);
+  hypre_VectorH2D(b);
+  cusparseStatus_t status;
+#ifndef HYPRE_USE_CUDA_HYB
+  status= cusparseDcsrmv(hypre_CSRMatrixHandle(A) ,
+			 CUSPARSE_OPERATION_NON_TRANSPOSE, 
+			 A->num_rows-offset, A->num_cols, A->num_nonzeros,
+  			 &alpha, hypre_CSRMatrixDescr(A),
+			 hypre_CSRMatrixDataDevice(A) ,hypre_CSRMatrixIDevice(A)+offset,hypre_CSRMatrixJDevice(A),
+  			 hypre_VectorDataDevice(x), &beta, hypre_VectorDataDevice(b)+offset);
+  
+  if (status != CUSPARSE_STATUS_SUCCESS) {
+    printf("Matrix-vector multiplication failed");
+    cudaDeviceReset();
+    return 1;
+  } else //printf("SXS SpMV done\n");
+  
+#else
+    status= cusparseDhybmv(A->handle,CUSPARSE_OPERATION_NON_TRANSPOSE,
+  			 &alpha, A->descr, A->hybA, 
+  			 &x->data_device[0], &beta, &y->data_device[0]);
+  
+  if (status != CUSPARSE_STATUS_SUCCESS) {
+    printf("Matrix-vector multiplication using cusparseDhybmv failed");
+    cudaDeviceReset();
+    return 1;
+  } else //printf("SXS SpMV done\n");
+#endif
+  cudaDeviceSynchronize();
+  //HYPRE_Complex prenorm = hypre_VectorNorm(y);
+  hypre_VectorD2HCross(y,b,offset,b_size);
+  //printf("Pre & Post Norm of solution is %lf -> %lf\n",prenorm,hypre_VectorNorm(y));
+  return ierr;
+}
+
+
+#endif

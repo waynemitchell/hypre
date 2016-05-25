@@ -21,7 +21,12 @@
 #include "HYPRE_seq_mv.h"
 
 #include "_hypre_utilities.h"
-
+#ifdef HYPRE_USE_CUDA
+#include "cusparse.h"
+#include "cudaErrorCheck.h"
+#include "csr_cuda.h"
+#include "mynvtx.h"
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,7 +47,7 @@ extern "C" {
  * CSR Matrix
  *--------------------------------------------------------------------------*/
 
-typedef struct
+typedef struct hypre_CSRMatrix
 {
    HYPRE_Int     *i;
    HYPRE_Int     *j;
@@ -59,6 +64,11 @@ typedef struct
    HYPRE_Int     *rownnz;
    HYPRE_Int      num_rownnz;
 
+#ifdef HYPRE_USE_CUDA
+  struct cuda_CSRMatrix *dev;
+  
+#endif
+
 } hypre_CSRMatrix;
 
 /*--------------------------------------------------------------------------
@@ -74,6 +84,16 @@ typedef struct
 #define hypre_CSRMatrixRownnz(matrix)       ((matrix) -> rownnz)
 #define hypre_CSRMatrixNumRownnz(matrix)    ((matrix) -> num_rownnz)
 #define hypre_CSRMatrixOwnsData(matrix)     ((matrix) -> owns_data)
+
+#ifdef HYPRE_USE_CUDA
+#define hypre_CSRMatrixDevice(matrix)         ((matrix) -> dev)
+#define hypre_CSRMatrixDataDevice(matrix)         ((matrix) -> dev -> data)
+#define hypre_CSRMatrixIDevice(matrix)            ((matrix) -> dev ->i )
+#define hypre_CSRMatrixJDevice(matrix)            ((matrix) -> dev ->j)
+#define hypre_CSRMatrixHandle(matrix)            ((matrix) -> dev -> handle)
+#define hypre_CSRMatrixDescr(matrix)            ((matrix) -> dev -> descr)  
+#define hypre_CSRMatrixCopiedToDevice(matrix)   ((matrix) -> dev ->copied)
+#endif
 
 HYPRE_Int hypre_CSRMatrixGetLoadBalancedPartitionBegin( hypre_CSRMatrix *A );
 HYPRE_Int hypre_CSRMatrixGetLoadBalancedPartitionEnd( hypre_CSRMatrix *A );
@@ -209,6 +229,9 @@ typedef struct
    HYPRE_Int  vecstride, idxstride;
    /* ... so vj[i] = data[ j*vecstride + i*idxstride ] regardless of row_storage.*/
 
+#ifdef HYPRE_USE_CUDA
+  struct cuda_Vector *dev;
+#endif
 } hypre_Vector;
 
 /*--------------------------------------------------------------------------
@@ -222,6 +245,11 @@ typedef struct
 #define hypre_VectorMultiVecStorageMethod(vector) ((vector) -> multivec_storage_method)
 #define hypre_VectorVectorStride(vector) ((vector) -> vecstride )
 #define hypre_VectorIndexStride(vector) ((vector) -> idxstride )
+
+#ifdef HYPRE_USE_CUDA
+#define hypre_VectorDevice(vector) ((vector) -> dev)
+#define hypre_VectorDataDevice(vector)      ((vector) -> dev -> data)
+#endif
 
 #endif
 
@@ -246,6 +274,15 @@ HYPRE_Int hypre_CSRMatrixCopy ( hypre_CSRMatrix *A , hypre_CSRMatrix *B , HYPRE_
 hypre_CSRMatrix *hypre_CSRMatrixClone ( hypre_CSRMatrix *A );
 hypre_CSRMatrix *hypre_CSRMatrixUnion ( hypre_CSRMatrix *A , hypre_CSRMatrix *B , HYPRE_Int *col_map_offd_A , HYPRE_Int *col_map_offd_B , HYPRE_Int **col_map_offd_C );
 
+#ifdef HYPRE_USE_CUDA
+void hypre_CSRMatrixMapToDevice(hypre_CSRMatrix *A);
+void hypre_CSRMatrixH2D(hypre_CSRMatrix *matrix);
+void hypre_CSRMatrixDataH2D(hypre_CSRMatrix *matrix);
+  void hypre_CSRMatrixIH2D(hypre_CSRMatrix *matrix);
+ void hypre_CSRMatrixJH2D(hypre_CSRMatrix *matrix);
+  void cuda_VectorDestroy(hypre_CSRMatrix *matrix);
+#endif
+
 /* csr_matvec.c */
 // y[offset:end] = alpha*A[offset:end,:]*x + beta*b[offset:end]
 HYPRE_Int hypre_CSRMatrixMatvecOutOfPlace ( HYPRE_Complex alpha , hypre_CSRMatrix *A , hypre_Vector *x , HYPRE_Complex beta , hypre_Vector *b, hypre_Vector *y, HYPRE_Int offset );
@@ -253,6 +290,24 @@ HYPRE_Int hypre_CSRMatrixMatvecOutOfPlace ( HYPRE_Complex alpha , hypre_CSRMatri
 HYPRE_Int hypre_CSRMatrixMatvec ( HYPRE_Complex alpha , hypre_CSRMatrix *A , hypre_Vector *x , HYPRE_Complex beta , hypre_Vector *y );
 HYPRE_Int hypre_CSRMatrixMatvecT ( HYPRE_Complex alpha , hypre_CSRMatrix *A , hypre_Vector *x , HYPRE_Complex beta , hypre_Vector *y );
 HYPRE_Int hypre_CSRMatrixMatvec_FF ( HYPRE_Complex alpha , hypre_CSRMatrix *A , hypre_Vector *x , HYPRE_Complex beta , hypre_Vector *y , HYPRE_Int *CF_marker_x , HYPRE_Int *CF_marker_y , HYPRE_Int fpt );
+
+#ifdef HYPRE_USE_CUDA
+HYPRE_Int
+hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
+                       hypre_CSRMatrix *A,
+			     hypre_Vector    *x,
+			     HYPRE_Complex    beta,
+			     hypre_Vector    *y     );
+
+HYPRE_Int
+hypre_CSRMatrixMatvecOutOfPlaceDevice( HYPRE_Complex    alpha,
+                                 hypre_CSRMatrix *A,
+                                 hypre_Vector    *x,
+                                 HYPRE_Complex    beta,
+                                 hypre_Vector    *b,
+                                 hypre_Vector    *y,
+				       HYPRE_Int        offset     );
+#endif
 
 /* genpart.c */
 HYPRE_Int hypre_GeneratePartitioning ( HYPRE_Int length , HYPRE_Int num_procs , HYPRE_Int **part_ptr );
@@ -265,6 +320,7 @@ HYPRE_Int HYPRE_CSRMatrixInitialize ( HYPRE_CSRMatrix matrix );
 HYPRE_CSRMatrix HYPRE_CSRMatrixRead ( char *file_name );
 void HYPRE_CSRMatrixPrint ( HYPRE_CSRMatrix matrix , char *file_name );
 HYPRE_Int HYPRE_CSRMatrixGetNumRows ( HYPRE_CSRMatrix matrix , HYPRE_Int *num_rows );
+
 
 /* HYPRE_mapped_matrix.c */
 HYPRE_MappedMatrix HYPRE_MappedMatrixCreate ( void );
@@ -337,7 +393,12 @@ HYPRE_Int hypre_SeqVectorScale ( HYPRE_Complex alpha , hypre_Vector *y );
 HYPRE_Int hypre_SeqVectorAxpy ( HYPRE_Complex alpha , hypre_Vector *x , hypre_Vector *y );
 HYPRE_Real hypre_SeqVectorInnerProd ( hypre_Vector *x , hypre_Vector *y );
 HYPRE_Complex hypre_VectorSumElts ( hypre_Vector *vector );
-
+#ifdef HYPRE_USE_CUDA
+void hypre_VectorMapToDevice(hypre_Vector *vector);
+HYPRE_Int hypre_VectorH2D(hypre_Vector *vector);
+void hypre_VectorD2H(hypre_Vector *vector);
+void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int size);
+#endif
 #ifdef __cplusplus
 }
 #endif

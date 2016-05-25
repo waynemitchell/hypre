@@ -15,7 +15,7 @@
  * Member functions for hypre_Vector class.
  *
  *****************************************************************************/
-
+#define USE_NVTX 1
 #include "seq_mv.h"
 #include <assert.h>
 
@@ -65,6 +65,13 @@ hypre_SeqVectorDestroy( hypre_Vector *vector )
 
    if (vector)
    {
+#ifdef HYPRE_USE_CUDA
+if (hypre_VectorDevice(vector)){
+  gpuErrchk(cudaFree(hypre_VectorDataDevice(vector)));
+  hypre_TFree(hypre_VectorDevice(vector));
+  hypre_VectorDevice(vector)=NULL;
+  }
+#endif
       if ( hypre_VectorOwnsData(vector) )
       {
          hypre_TFree(hypre_VectorData(vector));
@@ -506,3 +513,38 @@ HYPRE_Complex hypre_VectorSumElts( hypre_Vector *vector )
 
    return sum;
 }
+#ifdef HYPRE_USE_CUDA
+void hypre_VectorMapToDevice(hypre_Vector *vector){
+  if (!hypre_VectorDevice(vector)){
+    hypre_VectorDevice(vector)=hypre_CTAlloc(cuda_Vector, 1);
+    hypre_VectorDataDevice(vector)=NULL;
+  }
+  if (!hypre_VectorDataDevice(vector)){
+    gpuErrchk(cudaMalloc((void**)&hypre_VectorDataDevice(vector),hypre_VectorSize(vector)*sizeof(HYPRE_Complex)));
+  }
+}
+HYPRE_Int hypre_VectorH2D(hypre_Vector *vector){
+  PUSH_RANGE("VecDataSend",0);
+  gpuErrchk(cudaMemcpy(hypre_VectorDataDevice(vector),hypre_VectorData(vector),
+		       (size_t)(vector->size*sizeof(HYPRE_Complex)), 
+		       cudaMemcpyHostToDevice));
+  POP_RANGE;
+  
+}
+
+void hypre_VectorD2H(hypre_Vector *vector){
+  PUSH_RANGE("VecDataRecv",1);
+  gpuErrchk(cudaMemcpy(hypre_VectorData(vector),hypre_VectorDataDevice(vector),
+		   (size_t)(vector->size*sizeof(HYPRE_Complex)), 
+			cudaMemcpyDeviceToHost));
+  POP_RANGE;
+}
+
+void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int size){
+  PUSH_RANGE("VecDataXRecv",2);
+  gpuErrchk(cudaMemcpy(hypre_VectorData(dest),hypre_VectorDataDevice(src)+offset,
+		       (size_t)(size*sizeof(HYPRE_Complex)), 
+			cudaMemcpyDeviceToHost));
+  POP_RANGE;
+}
+#endif

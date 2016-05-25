@@ -1089,6 +1089,7 @@ HYPRE_Int  hypre_ParCSRRelax_L1_Jacobi( hypre_ParCSRMatrix *A,
     
     if (relax_points == 0)
     {
+      printf("Bracn1\n");
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(i,ii,jj,res) HYPRE_SMP_SCHEDULE
 #endif
@@ -1121,6 +1122,7 @@ HYPRE_Int  hypre_ParCSRRelax_L1_Jacobi( hypre_ParCSRMatrix *A,
      *-----------------------------------------------------------------*/
     else
     {
+      printf("Bracn2\n");
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(i,ii,jj,res) HYPRE_SMP_SCHEDULE
 #endif

@@ -289,7 +289,7 @@ main( hypre_int argc,
 
    ioutdat = 3;
    poutdat = 1;
-
+   cudaDeviceSynchronize();
    hypre_sprintf (plot_file_name,"AMGgrids.CF.dat");
 
    /*-----------------------------------------------------------
