@@ -15,7 +15,7 @@
  * Member functions for hypre_Vector class.
  *
  *****************************************************************************/
-#define USE_NVTX 1
+
 #include "seq_mv.h"
 #include <assert.h>
 
@@ -520,9 +520,21 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
     hypre_VectorDataDevice(vector)=NULL;
   }
   if (!hypre_VectorDataDevice(vector)){
-    gpuErrchk(cudaMalloc((void**)&hypre_VectorDataDevice(vector),hypre_VectorSize(vector)*sizeof(HYPRE_Complex)));
+    size_t size=hypre_VectorSize(vector)*sizeof(HYPRE_Complex);
+    size_t pgz=getpagesize();
+    size=((size+pgz-1)/pgz)*pgz;
+    gpuErrchk(cudaMalloc((void**)&hypre_VectorDataDevice(vector),size));
+    cudaError_t code = cudaHostRegister(hypre_VectorData(vector),size,cudaHostRegisterDefault);
+    if (code != cudaSuccess) 
+       {
+	 printf("Failed to register pointer %p of size %d CODE %d\n",hypre_VectorData(vector),size,code);
+	 //printf("Register fail: %s size = %d\n", cudaGetErrorString(code), size);
+       }
   }
 }
+
+// Synchronous vector copy
+
 HYPRE_Int hypre_VectorH2D(hypre_Vector *vector){
   PUSH_RANGE("VecDataSend",0);
   gpuErrchk(cudaMemcpy(hypre_VectorDataDevice(vector),hypre_VectorData(vector),
@@ -542,9 +554,37 @@ void hypre_VectorD2H(hypre_Vector *vector){
 
 void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int size){
   PUSH_RANGE("VecDataXRecv",2);
-  gpuErrchk(cudaMemcpy(hypre_VectorData(dest),hypre_VectorDataDevice(src)+offset,
+  gpuErrchk(cudaMemcpy(hypre_VectorData(dest)+offset,hypre_VectorDataDevice(src)+offset,
 		       (size_t)(size*sizeof(HYPRE_Complex)), 
 			cudaMemcpyDeviceToHost));
   POP_RANGE;
 }
+
+// Asynchronous vector copy
+
+HYPRE_Int hypre_VectorH2DAsync(hypre_Vector *vector,cudaStream_t s){
+  PUSH_RANGE("VecDataSendAsync",0);
+  gpuErrchk(cudaMemcpyAsync(hypre_VectorDataDevice(vector),hypre_VectorData(vector),
+		       (size_t)(vector->size*sizeof(HYPRE_Complex)), 
+			    cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+  
+}
+
+void hypre_VectorD2HAsync(hypre_Vector *vector,cudaStream_t s){
+  PUSH_RANGE("VecDataRecv",1);
+  gpuErrchk(cudaMemcpyAsync(hypre_VectorData(vector),hypre_VectorDataDevice(vector),
+		   (size_t)(vector->size*sizeof(HYPRE_Complex)), 
+			    cudaMemcpyDeviceToHost,s));
+  POP_RANGE;
+}
+
+void hypre_VectorD2HCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s){
+  PUSH_RANGE("VecDataXRecv",2);
+  gpuErrchk(cudaMemcpyAsync(hypre_VectorData(dest)+offset,hypre_VectorDataDevice(src)+offset,
+		       (size_t)(size*sizeof(HYPRE_Complex)), 
+		       cudaMemcpyDeviceToHost,s));
+  POP_RANGE;
+}
+
 #endif

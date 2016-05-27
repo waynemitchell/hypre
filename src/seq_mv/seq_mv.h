@@ -22,6 +22,7 @@
 
 #include "_hypre_utilities.h"
 #ifdef HYPRE_USE_CUDA
+#include "cuda.h"
 #include "cusparse.h"
 #include "cudaErrorCheck.h"
 #include "csr_cuda.h"
@@ -278,9 +279,13 @@ hypre_CSRMatrix *hypre_CSRMatrixUnion ( hypre_CSRMatrix *A , hypre_CSRMatrix *B 
 void hypre_CSRMatrixMapToDevice(hypre_CSRMatrix *A);
 void hypre_CSRMatrixH2D(hypre_CSRMatrix *matrix);
 void hypre_CSRMatrixDataH2D(hypre_CSRMatrix *matrix);
-  void hypre_CSRMatrixIH2D(hypre_CSRMatrix *matrix);
- void hypre_CSRMatrixJH2D(hypre_CSRMatrix *matrix);
-  void cuda_VectorDestroy(hypre_CSRMatrix *matrix);
+void hypre_CSRMatrixIH2D(hypre_CSRMatrix *matrix);
+void hypre_CSRMatrixJH2D(hypre_CSRMatrix *matrix);
+void hypre_CSRMatrixH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
+void hypre_CSRMatrixDataH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
+void hypre_CSRMatrixIH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
+void hypre_CSRMatrixJH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
+void cuda_MatrixDestroy(hypre_CSRMatrix *matrix);
 #endif
 
 /* csr_matvec.c */
@@ -306,7 +311,22 @@ hypre_CSRMatrixMatvecOutOfPlaceDevice( HYPRE_Complex    alpha,
                                  HYPRE_Complex    beta,
                                  hypre_Vector    *b,
                                  hypre_Vector    *y,
+			       HYPRE_Int        offset     );
+HYPRE_Int
+hypre_CSRMatrixMatvecOutOfPlaceHybrid( HYPRE_Complex    alpha,
+                                 hypre_CSRMatrix *A,
+                                 hypre_Vector    *x,
+                                 HYPRE_Complex    beta,
+                                 hypre_Vector    *b,
+                                 hypre_Vector    *y,
 				       HYPRE_Int        offset     );
+HYPRE_Int
+hypre_CSRMatrixMatvecStrip( HYPRE_Complex    alpha,
+			    hypre_CSRMatrix *A,
+			    hypre_Vector    *x,
+			    HYPRE_Complex    beta,
+			    hypre_Vector    *b,
+			    hypre_Vector    *y,HYPRE_Int start, HYPRE_Int end     );
 #endif
 
 /* genpart.c */
@@ -398,6 +418,10 @@ void hypre_VectorMapToDevice(hypre_Vector *vector);
 HYPRE_Int hypre_VectorH2D(hypre_Vector *vector);
 void hypre_VectorD2H(hypre_Vector *vector);
 void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int size);
+
+HYPRE_Int hypre_VectorH2DAsync(hypre_Vector *vector,cudaStream_t s);
+void hypre_VectorD2HAsync(hypre_Vector *vector,cudaStream_t s);
+void hypre_VectorD2HCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s);
 #endif
 #ifdef __cplusplus
 }

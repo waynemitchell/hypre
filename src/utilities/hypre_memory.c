@@ -59,7 +59,24 @@ hypre_MAlloc( size_t size )
 
       ptr = _umalloc_(size);
 #else
+#ifndef HYPRE_USE_CUDA
       ptr = malloc(size);
+#else
+      size_t new_size;
+	size_t pgz=getpagesize();
+	if (size>pgz*1){
+	  
+	  //new_size=(size/getpagesize()+1)*getpagesize();
+	  new_size=((size+pgz-1)/pgz)*pgz;
+	  //printf("Pagealigned memalloc %d -> %d , pagesize %d\n",size,new_size,pgz);
+	} else new_size=size;
+	
+	if (posix_memalign((void**)&ptr,getpagesize(),new_size)){
+	  printf("ERROR:: allocating page aligned memory in hypre_CAlloc of size %d bytes\n",size);
+	} else {
+	  //memset(ptr,0,new_size);
+	}
+#endif
 #endif
 
 #if 1
@@ -95,7 +112,28 @@ hypre_CAlloc( size_t count,
 
       ptr = _ucalloc_(count, elt_size);
 #else
+#ifndef HYPRE_USE_CUDA
       ptr = calloc(count, elt_size);
+#else
+      if (size<0) {
+	ptr = calloc(count, elt_size);
+      } else {
+	size_t new_size;
+	size_t pgz=getpagesize();
+	if (size>pgz*1){
+	  
+	  //new_size=(size/getpagesize()+1)*getpagesize();
+	  new_size=((size+pgz-1)/pgz)*pgz;
+	  //printf("Pagealigned memalloc %d -> %d , pagesize %d\n",size,new_size,pgz);
+	} else new_size=size;
+	
+	if (posix_memalign((void**)&ptr,getpagesize(),new_size)){
+	  printf("ERROR:: allocating page aligned memory in hypre_CAlloc of size %d bytes\n",size);
+	} else {
+	  memset(ptr,0,new_size);
+	}
+      }
+#endif
 #endif
 
 #if 1

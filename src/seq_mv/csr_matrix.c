@@ -15,7 +15,7 @@
  * Member functions for hypre_CSRMatrix class.
  *
  *****************************************************************************/
-#define USE_NVTX 1
+
 #include "seq_mv.h"
 #ifdef HYPRE_PROFILE
 HYPRE_Real hypre_profile_times[HYPRE_TIMER_ID_COUNT] = { 0 };
@@ -64,7 +64,7 @@ hypre_CSRMatrixDestroy( hypre_CSRMatrix *matrix )
    {
      
 #ifdef HYPRE_USE_CUDA
-     cuda_VectorDestroy(matrix);
+     cuda_MatrixDestroy(matrix);
 #endif
       hypre_TFree(hypre_CSRMatrixI(matrix));
       hypre_CSRMatrixI(matrix)    = NULL;
@@ -767,8 +767,43 @@ void hypre_CSRMatrixJH2D(hypre_CSRMatrix *matrix){
   POP_RANGE;
 }
 
+// The Asynchrononous versions of the ones above
 
-void cuda_VectorDestroy(hypre_CSRMatrix *matrix){
+void hypre_CSRMatrixH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s){
+ 
+  hypre_CSRMatrixDataH2DAsync(matrix,s);
+  hypre_CSRMatrixIH2DAsync(matrix,s);
+  hypre_CSRMatrixJH2DAsync(matrix,s);
+  
+ }
+  
+void hypre_CSRMatrixDataH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s){
+  PUSH_RANGE("MatDataSendAsync",0);
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixDataDevice(matrix),hypre_CSRMatrixData(matrix), 
+			(size_t)(matrix->num_nonzeros*sizeof(HYPRE_Complex)), 
+			    cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+}
+
+void hypre_CSRMatrixIH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s){
+  PUSH_RANGE("MatISendAsync",1);
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix), hypre_CSRMatrixI(matrix),
+		       (size_t)((matrix->num_rows+1)*sizeof(HYPRE_Int)), 
+			    cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+}
+
+void hypre_CSRMatrixJH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s){
+  PUSH_RANGE("MatJSendAsync",2);
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixJDevice(matrix),hypre_CSRMatrixJ(matrix),
+		       (size_t)(matrix->num_nonzeros*sizeof(HYPRE_Int)), 
+		       cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+}
+
+
+// dtor for the data allocated o the device
+void cuda_MatrixDestroy(hypre_CSRMatrix *matrix){
   if (hypre_CSRMatrixDevice(matrix)){
     //printf("Destorying CSR matrix on ccuda %d \n",hypre_CSRMatrixNumNonzeros(matrix));
     gpuErrchk(cudaFree(hypre_CSRMatrixDataDevice(matrix)));
