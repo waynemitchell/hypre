@@ -36,9 +36,9 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 
 #ifdef HYPRE_USE_CUDA
 
-#define CUDA_MATVEC_CUTOFF 5000000						
+#define CUDA_MATVEC_CUTOFF 0000000						
   if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
-    return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
+    return hypre_CSRMatrixMatvecOutOfPlaceDevice(alpha,A,x,beta,b,y,offset);
 
 #endif
 

@@ -17,7 +17,9 @@
 #include "_hypre_parcsr_ls.h"
 #include "float.h"
 #include "ams.h"
-
+#ifdef HYPRE_USE_CUDA
+void VecScale(double *u, double *v, double *l1_norm, int num_rows);
+#endif
 /*--------------------------------------------------------------------------
  * hypre_ParCSRRelax
  *
@@ -65,20 +67,48 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
    HYPRE_Real *u_data = hypre_VectorData(hypre_ParVectorLocalVector(u));
    HYPRE_Real *f_data = hypre_VectorData(hypre_ParVectorLocalVector(f));
    HYPRE_Real *v_data = hypre_VectorData(hypre_ParVectorLocalVector(v));
+   HYPRE_Real *l1_norms_device;
    //printf("Sweep count %d\n",relax_times);
    for (sweep = 0; sweep < relax_times; sweep++)
    {
       if (relax_type == 1) /* l1-scaled Jacobi */
       {
+	#define CUTOFF 10000
 	PUSH_RANGE("L1-SJacobi",0);
          HYPRE_Int i, num_rows = hypre_ParCSRMatrixNumRows(A);
-	 //printf("Relaxing here \n");
+	 //printf("Relaxing here %d %d\n",sizeof(HYPRE_Real),num_rows);
+	 // Get a copy of l1_norms ready on the device */
+	 if (num_rows>CUTOFF){
+	   PUSH_RANGE("NORM_COPY",1);
+	   gpuErrchk(cudaMalloc((void**)&l1_norms_device,num_rows*sizeof(HYPRE_Real)));
+	   //printf("Malloc done\n");
+	   static cudaStream_t s;
+	   static int first_call=0;
+	   if (!first_call){
+	     first_call=1;
+	     gpuErrchk(cudaStreamCreate(&s));
+	   }
+	   gpuErrchk(cudaMemcpyAsync(l1_norms_device,l1_norms,
+				     (size_t)(num_rows*sizeof(HYPRE_Real)), 
+				     cudaMemcpyHostToDevice,s));
+	   POP_RANGE
+	 }
+	 //printf("Memcopy done\n");
          hypre_ParVectorCopy(f,v);
          hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
-
+	 //printf("MATVEC done\n");
          /* u += w D^{-1}(f - A u), where D_ii = ||A(i,:)||_1 */
-         for (i = 0; i < num_rows; i++)
-            u_data[i] += v_data[i] / l1_norms[i];
+	 if (num_rows>CUTOFF){
+	   PUSH_RANGE("VEC_SCALE",2);
+	   VecScale(hypre_VectorDataDevice(hypre_ParVectorLocalVector(u)),
+		    hypre_VectorDataDevice(hypre_ParVectorLocalVector(v)),l1_norms_device,num_rows);
+	   //printf("VECSCALE done\n");
+	   hypre_VectorD2H(hypre_ParVectorLocalVector(u));
+	   gpuErrchk(cudaFree(l1_norms_device));
+	   POP_RANGE;
+	 } else 
+	   for (i = 0; i < num_rows; i++)
+	     u_data[i] += v_data[i] / l1_norms[i];
 	 POP_RANGE
       }
       else if (relax_type == 2 || relax_type == 4) /* offd-l1-scaled block GS */
