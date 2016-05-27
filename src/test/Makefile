@@ -49,7 +49,7 @@ LFLAGS =\
  ${MPILIBFLAGS}\
  ${LAPACKLIBFLAGS}\
  ${BLASLIBFLAGS}\
- ${LIBFLAGS} -L /opt/cudatoolkit-7.5/lib64 -lcusparse -lcudart -lcuda # -lnvToolsExt
+ ${LIBFLAGS} -L /opt/cudatoolkit-7.5/lib64 -lcusparse -lcudart -lcuda -lnvToolsExt
 
 ##################################################################
 # Targets

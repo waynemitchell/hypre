@@ -800,6 +800,48 @@ void hypre_CSRMatrixJH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s){
 		       cudaMemcpyHostToDevice,s));
   POP_RANGE;
 }
+// The Asynchrononous Partial versions 
+
+void hypre_CSRMatrixH2DAsyncPartial(hypre_CSRMatrix *matrix,float frac, cudaStream_t s){
+ 
+  size_t rows=(size_t)(matrix->num_rows*frac)+1;
+  size_t nnz=matrix->i[(int)(matrix->num_rows*frac)+1];
+  //nnz=hypre_CSRMatrixNumNonzeros(matrix);
+  HYPRE_Int nnz_send=nnz;
+  //printf("H2DAysncPartial rows %d (%d) NNZ %d (%d)\n",matrix->num_rows,rows,matrix->i[rows],nnz);
+  hypre_CSRMatrixDataH2DAsyncPartial(matrix,nnz,s);
+  hypre_CSRMatrixIH2DAsyncPartial(matrix,rows,s);
+  /* Update nrows+1 with the correct NNZ value */
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix)+rows, &nnz_send,
+			    (size_t)(sizeof(HYPRE_Int)), 
+			    cudaMemcpyHostToDevice,s));
+  hypre_CSRMatrixJH2DAsyncPartial(matrix,nnz, s);
+  
+ }
+  
+void hypre_CSRMatrixDataH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s){
+  PUSH_RANGE("MatDataSendAsync",0);
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixDataDevice(matrix),hypre_CSRMatrixData(matrix), 
+			(size_t)(size*sizeof(HYPRE_Complex)), 
+			    cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+}
+
+void hypre_CSRMatrixIH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size, cudaStream_t s){
+  PUSH_RANGE("MatISendAsync",1);
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix), hypre_CSRMatrixI(matrix),
+		       (size_t)(size*sizeof(HYPRE_Int)), 
+			    cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+}
+
+void hypre_CSRMatrixJH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size, cudaStream_t s){
+  PUSH_RANGE("MatJSendAsync",2);
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixJDevice(matrix),hypre_CSRMatrixJ(matrix),
+		       (size_t)(size*sizeof(HYPRE_Int)), 
+		       cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+}
 
 
 // dtor for the data allocated o the device

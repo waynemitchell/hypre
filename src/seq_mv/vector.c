@@ -570,7 +570,14 @@ HYPRE_Int hypre_VectorH2DAsync(hypre_Vector *vector,cudaStream_t s){
   POP_RANGE;
   
 }
-
+HYPRE_Int hypre_VectorH2DAsyncPartial(hypre_Vector *vector,size_t size,cudaStream_t s){
+  PUSH_RANGE("VecDataSendAsyncPartial",0);
+  gpuErrchk(cudaMemcpyAsync(hypre_VectorDataDevice(vector),hypre_VectorData(vector),
+		       (size_t)(size*sizeof(HYPRE_Complex)), 
+			    cudaMemcpyHostToDevice,s));
+  POP_RANGE;
+  
+}
 void hypre_VectorD2HAsync(hypre_Vector *vector,cudaStream_t s){
   PUSH_RANGE("VecDataRecv",1);
   gpuErrchk(cudaMemcpyAsync(hypre_VectorData(vector),hypre_VectorDataDevice(vector),
