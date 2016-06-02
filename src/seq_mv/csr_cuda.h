@@ -12,5 +12,5 @@ typedef struct cuda_CSRMatrix{
 typedef struct cuda_Vector{
   
   HYPRE_Complex  *data;
-  
+  HYPRE_Int offset1,offset2;
 } cuda_Vector;

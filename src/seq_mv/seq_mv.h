@@ -437,6 +437,7 @@ void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int 
 HYPRE_Int hypre_VectorH2DAsync(hypre_Vector *vector,cudaStream_t s);
 void hypre_VectorD2HAsync(hypre_Vector *vector,cudaStream_t s);
 void hypre_VectorD2HCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s);
+void hypre_VectorD2HAsyncPartial(hypre_Vector *vector,size_t size,cudaStream_t s);
 #endif
 #ifdef __cplusplus
 }

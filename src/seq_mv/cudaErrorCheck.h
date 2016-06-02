@@ -1,5 +1,6 @@
 #ifndef __cusparseErrorCheck__
 #define __cusparseErrorCheck__
+#include <stdio.h>
 static const char *cusparseErrorCheck(cusparseStatus_t error)
 {
     switch (error)
@@ -39,7 +40,7 @@ static inline void gpuAssert(cudaError_t code, const char *file, int line)
 {
    if (code != cudaSuccess) 
    {
-     fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+     printf("GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
    }
 }
 #define cusparseErrchk(ans) { cusparseAssert((ans), __FILE__, __LINE__); }

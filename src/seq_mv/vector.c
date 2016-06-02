@@ -518,6 +518,11 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
   if (!hypre_VectorDevice(vector)){
     hypre_VectorDevice(vector)=hypre_CTAlloc(cuda_Vector, 1);
     hypre_VectorDataDevice(vector)=NULL;
+    vector->dev->offset1=-1;
+    vector->dev->offset2=-1;
+    //printf("Vector mapped %p\n",hypre_VectorDevice(vector));
+  } else {
+    //printf("Call to map with valid device pointer %p\n",hypre_VectorDevice(vector));
   }
   if (!hypre_VectorDataDevice(vector)){
     size_t size=hypre_VectorSize(vector)*sizeof(HYPRE_Complex);
@@ -580,13 +585,19 @@ HYPRE_Int hypre_VectorH2DAsyncPartial(hypre_Vector *vector,size_t size,cudaStrea
   
 }
 void hypre_VectorD2HAsync(hypre_Vector *vector,cudaStream_t s){
-  PUSH_RANGE("VecDataRecv",1);
+  PUSH_RANGE("VecDataRecvAsync",1);
   gpuErrchk(cudaMemcpyAsync(hypre_VectorData(vector),hypre_VectorDataDevice(vector),
 		   (size_t)(vector->size*sizeof(HYPRE_Complex)), 
 			    cudaMemcpyDeviceToHost,s));
   POP_RANGE;
 }
-
+void hypre_VectorD2HAsyncPartial(hypre_Vector *vector,size_t size,cudaStream_t s){
+  PUSH_RANGE("VecDataRecvAsyncPartial",1);
+  gpuErrchk(cudaMemcpyAsync(hypre_VectorData(vector),hypre_VectorDataDevice(vector),
+		   (size_t)(size*sizeof(HYPRE_Complex)), 
+			    cudaMemcpyDeviceToHost,s));
+  POP_RANGE;
+}
 void hypre_VectorD2HCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s){
   PUSH_RANGE("VecDataXRecv",2);
   gpuErrchk(cudaMemcpyAsync(hypre_VectorData(dest)+offset,hypre_VectorDataDevice(src)+offset,
