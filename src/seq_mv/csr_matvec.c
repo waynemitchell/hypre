@@ -46,13 +46,13 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 #ifdef HYPRE_USE_CUDA
 
 
-#define CUDA_MATVEC_CUTOFF 50000000						
+#define CUDA_MATVEC_CUTOFF 5000000						
   //if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
   // return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
 
   if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF)
     return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
-
+  //printf("MATVEC_OOP on Host vec size %d\n",hypre_VectorSize(y));
 #endif
 
 
@@ -437,10 +437,14 @@ hypre_CSRMatrixMatvec( HYPRE_Complex    alpha,
 #ifndef HYPRE_USE_CUDA
   return hypre_CSRMatrixMatvecOutOfPlace(alpha, A, x, beta, y, y, 0);
 #else
-  if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF)
+  if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF){
+    //printf("MATVEC on device %d\n",hypre_VectorSize(y));
     return hypre_CSRMatrixMatvecDevice(alpha,A,x,beta,y);
-  else
+  }
+  else{
+    //printf("MATVEC on host %d\n",hypre_VectorSize(y));
     return hypre_CSRMatrixMatvecOutOfPlace(alpha, A, x, beta, y, y, 0);
+  }
 #endif
 }
 
@@ -807,7 +811,7 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
   if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
   if (!hypre_VectorDevice(y)) hypre_VectorMapToDevice(y);
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
-  
+  y->ref_count++;
   if (!hypre_CSRMatrixCopiedToDevice(A)){
     hypre_CSRMatrixH2D(A);
     hypre_CSRMatrixCopiedToDevice(A)=1;
@@ -1409,7 +1413,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
   float fraction=0.6000;
   offset2=hypre_VectorSize(x)*fraction; // needs to take offset1 into account. PBUGS
   offset=offset2;
-  
+  y->ref_count++;
    HYPRE_Complex    *A_data   = hypre_CSRMatrixData(A);
    HYPRE_Int        *A_i      = hypre_CSRMatrixI(A) + offset;
    HYPRE_Int        *A_j      = hypre_CSRMatrixJ(A);
@@ -1478,7 +1482,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
    if (num_cols != x_size && (num_rows != y_size || num_rows != b_size))
       ierr = 3;
 
-   //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
+   //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d oFFSET %d\n",A->num_rows,A->num_nonzeros,offset2);
    //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
    if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
    if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);

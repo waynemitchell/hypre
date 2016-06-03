@@ -130,59 +130,64 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
          hypre_ParVectorCopy(f,v);
 	 
          hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
-	 if (hypre_VectorDevice(hypre_ParVectorLocalVector(v))){
+	 if (hypre_VectorDevice(hypre_ParVectorLocalVector(v))&&hypre_ParVectorLocalVector(u)->dev){
 	   offset1=hypre_ParVectorLocalVector(v)->dev->offset1;
 	   offset2=hypre_ParVectorLocalVector(v)->dev->offset2;
-	 }
+	 } else offset2=-1;
 	
-	 //printf("MATVEC done\n");
+	 //printf("MATVECdone %p %p OFFSET %d VEC Size = %d\n",hypre_ParVectorLocalVector(u)->dev,hypre_ParVectorLocalVector(v)->dev,offset2,hypre_VectorSize(hypre_ParVectorLocalVector(u)));
          /* u += w D^{-1}(f - A u), where D_ii = ||A(i,:)||_1 */
 	 //offset2=-1;
-	 if (offset2>0){
+	 //printf("Pointers %p %p REF COUNT %d\n",hypre_ParVectorLocalVector(u),hypre_ParVectorLocalVector(v),hypre_ParVectorLocalVector(v)->ref_count);
+	 if (hypre_ParVectorLocalVector(v)->ref_count==2){
 	   HYPRE_Real *u_device=hypre_ParVectorLocalVector(u)->dev->data;
 	   HYPRE_Real *v_device=hypre_ParVectorLocalVector(v)->dev->data;
 	   PUSH_RANGE("VEC_SCALE_CUDA",2);
 	   //printf("VECSCALE OFFSETS %d %d num_rows = %d TYPRE %d %d\n",offset1,offset2,num_rows,sizeof(HYPRE_Complex),sizeof(HYPRE_Int));
 	   //cudaStreamSynchronize(s);
-	   //printf("Pointers %p %p \n",hypre_ParVectorLocalVector(u),hypre_ParVectorLocalVector(v));
-	   //printf("Pointers Device %p %p %p\n",u_device,v_device,l1_norms_device);
+	   // printf("Pointers %p %p REF COUNT %d\n",hypre_ParVectorLocalVector(u),hypre_ParVectorLocalVector(v),hypre_ParVectorLocalVector(v)->ref_count);
+	   
 	   if (hypre_VectorDataDevice(hypre_ParVectorLocalVector(u))&&hypre_VectorDataDevice(hypre_ParVectorLocalVector(v))){
-	  cudaDeviceSynchronize();
+	     //printf("VECSCALE Pointers Device %p %p %p OFFSET %d\n",u_device,v_device,l1_norms_device,offset2);
+	  gpuErrchk3(cudaDeviceSynchronize());
 	  VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
-	  cudaDeviceSynchronize();
+	  gpuErrchk3(cudaDeviceSynchronize());
 	   } else { 
 	     printf("ERROR:: Problem found NULL VECTORs\n");
 	     exit(1);
 	   }
 	   //printf("VECSCALE done\n");
-	   //hypre_VectorD2HAsyncPartial(hypre_ParVectorLocalVector(u),(size_t)(offset2-offset1),s);
+	   hypre_VectorD2HAsyncPartial(hypre_ParVectorLocalVector(u),(size_t)(offset2-offset1),s);
 	   // DEBUG AREA
-	   double *u_copy;
-	   u_copy = hypre_CTAlloc(double,num_rows);
-	   gpuErrchk3(cudaMemcpy(u_copy,hypre_ParVectorLocalVector(u)->dev->data,offset2*sizeof(double),cudaMemcpyDeviceToHost));
+	   //double *u_copy;
+	   //u_copy = hypre_CTAlloc(double,num_rows);
+	   //gpuErrchk3(cudaMemcpy(u_copy,hypre_ParVectorLocalVector(u)->dev->data,offset2*sizeof(double),cudaMemcpyDeviceToHost));
 	   
-	   //gpuErrchk3(cudaFree(l1_norms_device));
+
 	   cudaStreamSynchronize(s);
 	   POP_RANGE
 	   PUSH_RANGE("VEC_SCALE_HOST",3);
-	   for (i = 0; i < num_rows; i++)
+	   for (i = offset2; i < num_rows; i++)
 	     u_data[i] += v_data[i] / l1_norms[i];
-	   int errc=0;
-	   for (i=0;i<offset2;i++) if (u_copy[i]!=u_data[i]) {
-	       printf("Diff %d %lf %lf v=%lf l1 = %lf\n",i,u_data[i],u_copy[i],v_data[i],l1_norms[i]);
-	       errc++;
-	       if (errc>0) break;
-	     }
-	   hypre_TFree(u_copy);
+	   //int errc=0;
+	   //for (i=0;i<offset2;i++) if (u_copy[i]!=u_data[i]) {
+	   //    printf("Diff %d %lf %lf v=%lf l1 = %lf\n",i,u_data[i],u_copy[i],v_data[i],l1_norms[i]);
+	   //    errc++;
+	   //    if (errc>0) break;
+	   //  }
+	   //hypre_TFree(u_copy);
 	   POP_RANGE
-	     hypre_ParVectorLocalVector(v)->dev->offset1=-1;
+	   hypre_ParVectorLocalVector(v)->dev->offset1=-1;
 	   hypre_ParVectorLocalVector(v)->dev->offset2=-1;
+	   hypre_ParVectorLocalVector(u)->dev->offset1=-1;
+	   hypre_ParVectorLocalVector(u)->dev->offset2=-1;
 	 } else 
 	   for (i = 0; i < num_rows; i++)
 	     u_data[i] += v_data[i] / l1_norms[i];
 	 if (memalloc==1) gpuErrchk3(cudaFree(l1_norms_device));
 	 POP_RANGE
-	 
+	   if (hypre_ParVectorLocalVector(u)->dev)hypre_ParVectorLocalVector(u)->dev->offset2=-1;
+	 if (hypre_ParVectorLocalVector(v)->dev)hypre_ParVectorLocalVector(v)->dev->offset2=-1;
       }
       else if (relax_type == 2 || relax_type == 4) /* offd-l1-scaled block GS */
       {

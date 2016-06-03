@@ -32,7 +32,7 @@ void VecScaleKernel(double *u, double *v, double *l1_norm, int num_rows){
   //if (i<10) printf("%d %lf %lf %lf\n",i,u[i],v[i],l1_norm[i]);
   if (i<num_rows){
     u[i]+=v[i]/l1_norm[i];
-    if (i==0) printf("Diff Device %d %lf %lf %lf\n",i,u[i],v[i],l1_norm[i]);
+    //if (i==0) printf("Diff Device %d %lf %lf %lf\n",i,u[i],v[i],l1_norm[i]);
   }
 }
 }

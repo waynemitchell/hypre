@@ -232,6 +232,7 @@ typedef struct
 
 #ifdef HYPRE_USE_CUDA
   struct cuda_Vector *dev;
+  HYPRE_Int ref_count;
 #endif
 } hypre_Vector;
 
