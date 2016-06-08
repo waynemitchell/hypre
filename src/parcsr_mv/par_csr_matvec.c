@@ -233,7 +233,16 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
    hypre_profile_times[HYPRE_TIMER_ID_HALO_EXCHANGE] += hypre_MPI_Wtime();
 #endif
 
-   if (num_cols_offd) hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local);    
+#ifdef HYPRE_USE_CUDA
+   if (num_cols_offd) {
+     if (y_local->ref_count==1)hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,offd,x_tmp,1.0,y_local,y_local,0); 
+     else hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local); 
+   } else {
+     y_local->ref_count++;
+   }
+#else
+   if (num_cols_offd) hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local); 
+#endif
 
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_PACK_UNPACK] -= hypre_MPI_Wtime();

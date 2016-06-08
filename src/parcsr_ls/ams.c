@@ -25,6 +25,7 @@ inline void gpuAssert3(cudaError_t code, const char *file, int line)
 {
    if (code != cudaSuccess) 
    {
+     printf("ERROR in line %d pf file %s\n", line,file);
      printf("GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
    }
 }
@@ -76,7 +77,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
    HYPRE_Real *u_data = hypre_VectorData(hypre_ParVectorLocalVector(u));
    HYPRE_Real *f_data = hypre_VectorData(hypre_ParVectorLocalVector(f));
    HYPRE_Real *v_data = hypre_VectorData(hypre_ParVectorLocalVector(v));
-   HYPRE_Real *l1_norms_device;
+   HYPRE_Real *l1_norms_device=NULL;
    int offset1=-1,offset2=-2;
    //printf("Sweep count %d\n",relax_times);
    for (sweep = 0; sweep < relax_times; sweep++)
@@ -95,36 +96,54 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
          HYPRE_Int i, num_rows = hypre_ParCSRMatrixNumRows(A);
 	 //printf("Relaxing here %d %d\n",sizeof(HYPRE_Real),num_rows);
 	 // Get a copy of l1_norms ready on the device */
+	 int send_l1_norm=0;
+	 hypre_CSRMatrix   *diag   = hypre_ParCSRMatrixDiag(A);
+	 if (diag->dev){ // The matrix has been shadowed on the device
+	   if (!hypre_CSRMatrixCopiedToDevice(diag)) send_l1_norm=1; // But not been copied or some reason
+	   if (diag->dev->l1_norms_device)
+	     l1_norms_device=diag->dev->l1_norms_device;
+	   else
+	     send_l1_norm=1;
+	 } else send_l1_norm=1;
 
-	 if (num_rows>CUTOFF){
-	   PUSH_RANGE("NORM_COPY",1);
-	   gpuErrchk3(cudaMalloc((void**)&l1_norms_device,num_rows*sizeof(HYPRE_Real)));
-	   //printf("Malloc done\n");
-	   memalloc=1;
-	   PUSH_RANGE("NORM_REGISTER",2)
-	   size_t new_size;
-	   size_t pgz=getpagesize();
-	   size_t size=(size_t)(num_rows*sizeof(HYPRE_Real));
-	   if ((size>pgz)&&(!hypre_ParCSRMatrixDiag(A)->dev)){
-	     new_size=((size+pgz-1)/pgz)*pgz;
-	     //printf("Palnning to register mem of size %d to %d\n",size,new_size);
-	     // Note this memregister fails after a few calls when trying to re-reister 
-	     // registered memory. Need to find a fix for this 
-	     //cudaError_t ce=cudaHostRegister(l1_norms,new_size,cudaHostRegisterDefault);
-	     ////if (ce!=cudaSuccess) 
-	     //  {
-		 //printf("ERROR:: Memory registration failed %p\n",l1_norms);
-		 //printf("ERROR:: Host register fail %s\n",cudaGetErrorString(ce));
-	     //  } //else printf("SUCCESSFULL MEMORY REGISRATION %p\n",l1_norms);
-	   }
+	 //send_l1_norm=0; // No scaling on GPU
+	 //printf("RELAX flag = %d diag=-dev= %p\n",send_l1_norm,diag->dev);
+	 int registered=0;
+	 if (send_l1_norm){
+	   if (num_rows>CUTOFF){
+	     
+	     PUSH_RANGE("NORM_COPY",1);
+	     gpuErrchk3(cudaMalloc((void**)&l1_norms_device,num_rows*sizeof(HYPRE_Real)));
+	     //printf("l1_norms_Device Malloc done for %p on matrix dev %p \n",l1_norms,diag->dev);
+	     memalloc=1;
+	     PUSH_RANGE("NORM_REGISTER",2)
+	     size_t new_size;
+	     size_t pgz=getpagesize();
+	     size_t size=(size_t)(num_rows*sizeof(HYPRE_Real));
+	     if ((size>pgz)){
+	       new_size=((size+pgz-1)/pgz)*pgz;
+	       //printf("Palnning to register mem of size %d to %d\n",size,new_size);
+	       // Note this memregister fails after a few calls when trying to re-reister 
+	       // registered memory. Need to find a fix for this 
+	       cudaError_t ce=cudaHostRegister(l1_norms,new_size,cudaHostRegisterDefault);
+	       if (ce!=cudaSuccess) 
+	       {
+	       printf("ERROR:: Memory registration failed %p\n",l1_norms);
+	       printf("ERROR:: Host register fail %s\n",cudaGetErrorString(ce));
+	       } else {
+		 //printf("SUCCESSFULL MEMORY REGISRATION %p\n",l1_norms);
+		 registered=1;
+	       }
+	     }
 	   POP_RANGE
 	     //gpuErrchk3(cudaMemcpyAsync(l1_norms_device,l1_norms,
 	     //			     (size_t)(num_rows*sizeof(HYPRE_Real)), 
 	     //			     cudaMemcpyHostToDevice,s));
-	   gpuErrchk3(cudaMemcpy(l1_norms_device,l1_norms,
+	   gpuErrchk3(cudaMemcpyAsync(l1_norms_device,l1_norms,
 				     (size_t)(num_rows*sizeof(HYPRE_Real)), 
-				     cudaMemcpyHostToDevice));
+				      cudaMemcpyHostToDevice,s));
 	   POP_RANGE
+	     }
 	 }
 	 //printf("Memcopy done\n");
          hypre_ParVectorCopy(f,v);
@@ -149,9 +168,9 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   
 	   if (hypre_VectorDataDevice(hypre_ParVectorLocalVector(u))&&hypre_VectorDataDevice(hypre_ParVectorLocalVector(v))){
 	     //printf("VECSCALE Pointers Device %p %p %p OFFSET %d\n",u_device,v_device,l1_norms_device,offset2);
-	  gpuErrchk3(cudaDeviceSynchronize());
+	     gpuErrchk3(cudaDeviceSynchronize()); // To make sure l1_norms_device is avalable and the matvecs are done
 	  VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
-	  gpuErrchk3(cudaDeviceSynchronize());
+	  
 	   } else { 
 	     printf("ERROR:: Problem found NULL VECTORs\n");
 	     exit(1);
@@ -164,7 +183,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   //gpuErrchk3(cudaMemcpy(u_copy,hypre_ParVectorLocalVector(u)->dev->data,offset2*sizeof(double),cudaMemcpyDeviceToHost));
 	   
 
-	   cudaStreamSynchronize(s);
+	   
 	   POP_RANGE
 	   PUSH_RANGE("VEC_SCALE_HOST",3);
 	   for (i = offset2; i < num_rows; i++)
@@ -181,10 +200,17 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   hypre_ParVectorLocalVector(v)->dev->offset2=-1;
 	   hypre_ParVectorLocalVector(u)->dev->offset1=-1;
 	   hypre_ParVectorLocalVector(u)->dev->offset2=-1;
-	 } else 
+	   cudaStreamSynchronize(s);
+	   
+	 } else {
 	   for (i = 0; i < num_rows; i++)
 	     u_data[i] += v_data[i] / l1_norms[i];
-	 if (memalloc==1) gpuErrchk3(cudaFree(l1_norms_device));
+	   //printf("Unregistering %p \n",l1_norms);
+	   if (registered) gpuErrchk3(cudaHostUnregister(l1_norms));
+
+	 }
+	 //if (memalloc==1) gpuErrchk3(cudaFree(l1_norms_device));
+	 if (l1_norms_device && diag->dev) diag->dev->l1_norms_device=l1_norms_device;
 	 POP_RANGE
 	   if (hypre_ParVectorLocalVector(u)->dev)hypre_ParVectorLocalVector(u)->dev->offset2=-1;
 	 if (hypre_ParVectorLocalVector(v)->dev)hypre_ParVectorLocalVector(v)->dev->offset2=-1;

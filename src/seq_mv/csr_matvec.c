@@ -47,11 +47,11 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 
 
 #define CUDA_MATVEC_CUTOFF 5000000						
-  //if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
-  // return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
-
-  if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF)
+  if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
     return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
+  //printf("Matrix Vector OOP %d   %d \n",hypre_CSRMatrixNumNonzeros(A),hypre_VectorSize(y));
+  //if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF)
+  // return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
   //printf("MATVEC_OOP on Host vec size %d\n",hypre_VectorSize(y));
 #endif
 
@@ -437,7 +437,9 @@ hypre_CSRMatrixMatvec( HYPRE_Complex    alpha,
 #ifndef HYPRE_USE_CUDA
   return hypre_CSRMatrixMatvecOutOfPlace(alpha, A, x, beta, y, y, 0);
 #else
-  if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF){
+  //printf("Matrix Vector %d   %d \n",hypre_CSRMatrixNumNonzeros(A),hypre_VectorSize(y));
+  if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF){
+  //if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF){
     //printf("MATVEC on device %d\n",hypre_VectorSize(y));
     return hypre_CSRMatrixMatvecDevice(alpha,A,x,beta,y);
   }
@@ -805,6 +807,7 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
                        hypre_Vector    *x,
                        HYPRE_Complex    beta,
                        hypre_Vector    *y     ){
+  PUSH_RANGE("Matvec DEVICE",4);
   //printf("Entre hypre_CSRMatrixMatvec CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
   //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
   if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
@@ -869,6 +872,7 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
   //HYPRE_Complex prenorm = hypre_VectorNorm(y);
   hypre_VectorD2H(y);
   //printf("Pre & Post Norm of solution is %lf -> %lf\n",prenorm,hypre_VectorNorm(y));
+  POP_RANGE;
 }
 
 HYPRE_Int
@@ -1414,6 +1418,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
   offset2=hypre_VectorSize(x)*fraction; // needs to take offset1 into account. PBUGS
   offset=offset2;
   y->ref_count++;
+  //printf("Call to Hybrid:: ref_count = %d\n",y->ref_count);
    HYPRE_Complex    *A_data   = hypre_CSRMatrixData(A);
    HYPRE_Int        *A_i      = hypre_CSRMatrixI(A) + offset;
    HYPRE_Int        *A_j      = hypre_CSRMatrixJ(A);
@@ -1520,8 +1525,8 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
     // WARNING:: assumes that A is static and doesnot change 
   }
    hypre_VectorH2DAsync(x,s);
-   //hypre_VectorH2DAsyncPartial(b,offset2-offset1,s); // PBUGS if offset1 !=0
-   hypre_VectorH2DAsync(b,s);
+   hypre_VectorH2DAsyncPartial(b,offset2-offset1,s); // PBUGS if offset1 !=0
+   //hypre_VectorH2DAsync(b,s);
   cusparseStatus_t status;
 #ifndef HYPRE_USE_CUDA_HYB
   status=cusparseSetStream(hypre_CSRMatrixHandle(A) ,s);

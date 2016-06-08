@@ -67,8 +67,10 @@ hypre_SeqVectorDestroy( hypre_Vector *vector )
    {
 #ifdef HYPRE_USE_CUDA
 if (hypre_VectorDevice(vector)){
+  cudaHostUnregister(hypre_VectorData(vector));
   gpuErrchk(cudaFree(hypre_VectorDataDevice(vector)));
   hypre_TFree(hypre_VectorDevice(vector));
+  
   hypre_VectorDevice(vector)=NULL;
   }
 #endif
@@ -529,8 +531,8 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
     size_t pgz=getpagesize();
     size=((size+pgz-1)/pgz)*pgz;
     gpuErrchk(cudaMalloc((void**)&hypre_VectorDataDevice(vector),size));
-    //cudaError_t code = cudaHostRegister(hypre_VectorData(vector),size,cudaHostRegisterDefault);
-    cudaError_t code=cudaSuccess;
+    cudaError_t code = cudaHostRegister(hypre_VectorData(vector),size,cudaHostRegisterDefault);
+    //cudaError_t code=cudaSuccess;
     if (code != cudaSuccess) 
        {
 	 printf("Failed to register pointer %p of size %d CODE %d\n",hypre_VectorData(vector),size,code);

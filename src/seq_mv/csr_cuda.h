@@ -7,10 +7,12 @@ typedef struct cuda_CSRMatrix{
   cusparseHandle_t handle;
   cusparseMatDescr_t descr;
   HYPRE_Int copied;
+  HYPRE_Real *l1_norms_device;
 } cuda_CSRMatrix;
 
 typedef struct cuda_Vector{
   
   HYPRE_Complex  *data;
   HYPRE_Int offset1,offset2;
+  //HYPRE_Int registered;
 } cuda_Vector;
