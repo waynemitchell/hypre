@@ -48,7 +48,7 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 
 #define CUDA_MATVEC_CUTOFF 5000000						
   if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
-    return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
+    return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset,0.6);
   //printf("Matrix Vector OOP %d   %d \n",hypre_CSRMatrixNumNonzeros(A),hypre_VectorSize(y));
   //if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF)
   // return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
@@ -1320,7 +1320,7 @@ hypre_CSRMatrixMatvecStrip( HYPRE_Complex    alpha,
 			    hypre_Vector    *b,
 			    hypre_Vector    *y,HYPRE_Int start, HYPRE_Int end     )
 {
-  PUSH_RANGE("Matvec Strip",5);
+  PUSH_RANGE_PAYLOAD("MV HYB HOST",5,end-start);
   HYPRE_Complex    *A_data;
   HYPRE_Int        *A_i; 
   HYPRE_Int        *A_j; 
@@ -1407,16 +1407,18 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
                                  HYPRE_Complex    beta,
                                  hypre_Vector    *b,
                                  hypre_Vector    *y,
-                                 HYPRE_Int        offset1     )
+					HYPRE_Int        offset1,HYPRE_Real fraction     )
 {
   /* This version computes the bottom section of the product on the host and 
      sends the top half to the device.
   */
-  PUSH_RANGE("MV-Hybrid2",4);
+
   HYPRE_Int  offset,offset2; // Total and 2nd offset for the hybrid operation
-  float fraction=0.6000;
-  offset2=hypre_VectorSize(x)*fraction; // needs to take offset1 into account. PBUGS
+  //float fraction=1.0;
+  offset2=hypre_VectorSize(b)*fraction; // needs to take offset1 into account. PBUGS
   offset=offset2;
+
+  PUSH_RANGE_PAYLOAD("MV-HYB-2P",4,offset2)
   y->ref_count++;
   //printf("Call to Hybrid:: ref_count = %d\n",y->ref_count);
    HYPRE_Complex    *A_data   = hypre_CSRMatrixData(A);

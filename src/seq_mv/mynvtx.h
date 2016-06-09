@@ -16,6 +16,23 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
     eventAttrib.message.ascii = name; \
     nvtxRangePushEx(&eventAttrib); \
 }
+
+#define PUSH_RANGE_PAYLOAD(name,cid,load) {		\
+    int color_id = cid; \
+    color_id = color_id%num_colors;\
+    nvtxEventAttributes_t eventAttrib = {0}; \
+    eventAttrib.version = NVTX_VERSION; \
+    eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+    eventAttrib.colorType = NVTX_COLOR_ARGB; \
+    eventAttrib.color = colors[color_id]; \
+    eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+    eventAttrib.message.ascii = name; \
+    eventAttrib.payloadType = NVTX_PAYLOAD_TYPE_INT64; \
+    eventAttrib.payload.llValue = load; \
+    eventAttrib.category=1; \
+    nvtxRangePushEx(&eventAttrib); \
+}
+
 #define POP_RANGE nvtxRangePop();
 #else
 #define PUSH_RANGE(name,cid)

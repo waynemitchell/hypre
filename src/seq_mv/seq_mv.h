@@ -342,7 +342,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
                                  HYPRE_Complex    beta,
                                  hypre_Vector    *b,
                                  hypre_Vector    *y,
-				       HYPRE_Int        offset     );
+					HYPRE_Int        offset ,HYPRE_Real fraction    );
 #endif
 
 /* genpart.c */

@@ -68,7 +68,10 @@ hypre_SeqVectorDestroy( hypre_Vector *vector )
 #ifdef HYPRE_USE_CUDA
 if (hypre_VectorDevice(vector)){
   cudaHostUnregister(hypre_VectorData(vector));
-  gpuErrchk(cudaFree(hypre_VectorDataDevice(vector)));
+  cudaError_t ce=cudaFree(hypre_VectorDataDevice(vector));
+  if (ce!=cudaSuccess){
+    printf("CUDA ERROR AT %s\n",cudaGetErrorString(ce));
+  }
   hypre_TFree(hypre_VectorDevice(vector));
   
   hypre_VectorDevice(vector)=NULL;

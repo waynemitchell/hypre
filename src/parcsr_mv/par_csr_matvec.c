@@ -207,8 +207,13 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #ifdef HYPRE_USE_CUDA
    y_local->ref_count=0;
 #endif
+#ifdef HYPRE_USE_CUDA
+   PUSH_RANGE("PMV MV 1",0)
+#endif
    hypre_CSRMatrixMatvecOutOfPlace( alpha, diag, x_local, beta, b_local, y_local, 0);
-
+#ifdef HYPRE_USE_CUDA
+   POP_RANGE
+#endif
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_HALO_EXCHANGE] -= hypre_MPI_Wtime();
 #endif
@@ -234,12 +239,14 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #endif
 
 #ifdef HYPRE_USE_CUDA
+   PUSH_RANGE_PAYLOAD("PMV MV 2",0,hypre_CSRMatrixNumRows(offd))
    if (num_cols_offd) {
-     if (y_local->ref_count==1)hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,offd,x_tmp,1.0,y_local,y_local,0); 
+     if (y_local->ref_count==1)hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,offd,x_tmp,1.0,y_local,y_local,0,0.3); 
      else hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local); 
    } else {
      y_local->ref_count++;
    }
+ POP_RANGE
 #else
    if (num_cols_offd) hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local); 
 #endif
