@@ -48,7 +48,7 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 
 #define CUDA_MATVEC_CUTOFF 5000000						
   if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
-    return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset,0.6);
+    return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset,0.65);
   //printf("Matrix Vector OOP %d   %d \n",hypre_CSRMatrixNumNonzeros(A),hypre_VectorSize(y));
   //if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF)
   // return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
@@ -1494,6 +1494,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
    if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
    if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
    if (!hypre_VectorDevice(b)) hypre_VectorMapToDevice(b);
+   if (!hypre_VectorDevice(y)) hypre_VectorMapToDevice(y);
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
    b->dev->offset1=offset1;
    b->dev->offset2=offset2;
@@ -1527,7 +1528,11 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
     // WARNING:: assumes that A is static and doesnot change 
   }
    hypre_VectorH2DAsync(x,s);
-   hypre_VectorH2DAsyncPartial(b,offset2-offset1,s); // PBUGS if offset1 !=0
+   if (b->dev->send_to_device){
+     //printf("COpying b to device %lf %lf %lf %lf %lf\n",b->data[0],b->data[1],b->data[2],b->data[3],b->data[4]);
+     //hypre_VectorH2DAsyncPartial(b,offset2-offset1,s); // PBUGS if offset1 !=0
+     hypre_VectorH2DCrossAsync(y,b,offset1,offset2-offset1,s); 
+   } //else  printf("NOT COpying b to device %lf %lf %lf %lf %lf\n",b->data[0],b->data[1],b->data[2],b->data[3],b->data[4]);
    //hypre_VectorH2DAsync(b,s);
   cusparseStatus_t status;
 #ifndef HYPRE_USE_CUDA_HYB
@@ -1540,7 +1545,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
 			 offset2-offset1, A->num_cols, A->num_nonzeros,
   			 &alpha, hypre_CSRMatrixDescr(A),
 			 hypre_CSRMatrixDataDevice(A) ,hypre_CSRMatrixIDevice(A)+offset1,hypre_CSRMatrixJDevice(A),
-  			 hypre_VectorDataDevice(x), &beta, hypre_VectorDataDevice(b)+offset1);
+  			 hypre_VectorDataDevice(x), &beta, hypre_VectorDataDevice(y)+offset1);
   
   if (status != CUSPARSE_STATUS_SUCCESS) {
     printf("Matrix-vector multiplication failed");
@@ -1561,7 +1566,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
 #endif
 
   //HYPRE_Complex prenorm = hypre_VectorNorm(y);
-  hypre_VectorD2HCrossAsync(y,b,offset1,offset2-offset1,s);
+    if (y->bring_from_device) hypre_VectorD2HCrossAsync(y,y,offset1,offset2-offset1,s);
   //printf("Pre & Post Norm of solution is %lf -> %lf\n",prenorm,hypre_VectorNorm(y));
 
   // Call the host code

@@ -233,6 +233,8 @@ typedef struct
 #ifdef HYPRE_USE_CUDA
   struct cuda_Vector *dev;
   HYPRE_Int ref_count;
+  HYPRE_Int bring_from_device;
+
 #endif
 } hypre_Vector;
 
@@ -434,9 +436,10 @@ void hypre_VectorMapToDevice(hypre_Vector *vector);
 HYPRE_Int hypre_VectorH2D(hypre_Vector *vector);
 void hypre_VectorD2H(hypre_Vector *vector);
 void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int size);
-
+HYPRE_Int hypre_VectorH2DAsyncPartial(hypre_Vector *vector,size_t size,cudaStream_t s);
 HYPRE_Int hypre_VectorH2DAsync(hypre_Vector *vector,cudaStream_t s);
 void hypre_VectorD2HAsync(hypre_Vector *vector,cudaStream_t s);
+void hypre_VectorH2DCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s);
 void hypre_VectorD2HCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s);
 void hypre_VectorD2HAsyncPartial(hypre_Vector *vector,size_t size,cudaStream_t s);
 #endif

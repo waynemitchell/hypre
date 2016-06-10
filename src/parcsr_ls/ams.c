@@ -85,6 +85,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
      	 int memalloc=0;
       if (relax_type == 1) /* l1-scaled Jacobi */
       {
+	//printf("**************************** LS1-JACOBI ENTER ************************\n");
 	static cudaStream_t s;
 	static int first_call=0;
 	if (!first_call){
@@ -110,10 +111,11 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	 //printf("RELAX flag = %d diag=-dev= %p\n",send_l1_norm,diag->dev);
 	 int registered=0;
 	 if (send_l1_norm){
+	   int send_size=num_rows*0.65; // PBUGS WARNING HARDWIRED
 	   if (num_rows>CUTOFF){
 	     
 	     PUSH_RANGE("NORM_COPY",1);
-	     gpuErrchk3(cudaMalloc((void**)&l1_norms_device,num_rows*sizeof(HYPRE_Real)));
+	     gpuErrchk3(cudaMalloc((void**)&l1_norms_device,send_size*sizeof(HYPRE_Real)));
 	     //printf("l1_norms_Device Malloc done for %p on matrix dev %p \n",l1_norms,diag->dev);
 	     memalloc=1;
 	     PUSH_RANGE("NORM_REGISTER",2)
@@ -122,7 +124,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	     size_t size=(size_t)(num_rows*sizeof(HYPRE_Real));
 	     if ((size>pgz)){
 	       new_size=((size+pgz-1)/pgz)*pgz;
-	       //printf("Palnning to register mem of size %d to %d\n",size,new_size);
+	       //printf("Planning to register mem of size %d to %d\n",size,new_size);
 	       // Note this memregister fails after a few calls when trying to re-reister 
 	       // registered memory. Need to find a fix for this 
 	       cudaError_t ce=cudaHostRegister(l1_norms,new_size,cudaHostRegisterDefault);
@@ -140,14 +142,15 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	     //			     (size_t)(num_rows*sizeof(HYPRE_Real)), 
 	     //			     cudaMemcpyHostToDevice,s));
 	   gpuErrchk3(cudaMemcpyAsync(l1_norms_device,l1_norms,
-				     (size_t)(num_rows*sizeof(HYPRE_Real)), 
+				     (size_t)(send_size*sizeof(HYPRE_Real)), 
 				      cudaMemcpyHostToDevice,s));
 	   POP_RANGE
 	     }
 	 }
 	 //printf("Memcopy done\n");
+	 PUSH_RANGE("V-COPY",5)
          hypre_ParVectorCopy(f,v);
-	 
+	 POP_RANGE
          hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
 	 if (hypre_VectorDevice(hypre_ParVectorLocalVector(v))&&hypre_ParVectorLocalVector(u)->dev){
 	   offset1=hypre_ParVectorLocalVector(v)->dev->offset1;
@@ -170,7 +173,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	     //printf("VECSCALE Pointers Device %p %p %p OFFSET %d\n",u_device,v_device,l1_norms_device,offset2);
 	     gpuErrchk3(cudaDeviceSynchronize()); // To make sure l1_norms_device is avalable and the matvecs are done
 	  VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
-	  
+	  //hypre_ParVectorLocalVector(v)->ref_count=0;
 	   } else { 
 	     printf("ERROR:: Problem found NULL VECTORs\n");
 	     exit(1);
@@ -214,6 +217,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	 POP_RANGE
 	   if (hypre_ParVectorLocalVector(u)->dev)hypre_ParVectorLocalVector(u)->dev->offset2=-1;
 	 if (hypre_ParVectorLocalVector(v)->dev)hypre_ParVectorLocalVector(v)->dev->offset2=-1;
+	 //printf("**************************** LS1-JACOBI EXIT ************************\n");
       }
       else if (relax_type == 2 || relax_type == 4) /* offd-l1-scaled block GS */
       {

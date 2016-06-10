@@ -66,7 +66,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
     *  these conditions terminates processing, and the ierr flag
     *  is informational only.
     *--------------------------------------------------------------------*/
- 
+   //printf("******************* PAR_CSR_MATVEC_ENTER **************************************\n");
    hypre_assert( idxstride>0 );
 
    if (num_cols != x_size)
@@ -209,9 +209,12 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #endif
 #ifdef HYPRE_USE_CUDA
    PUSH_RANGE("PMV MV 1",0)
+     y_local->bring_from_device=0;
 #endif
+
    hypre_CSRMatrixMatvecOutOfPlace( alpha, diag, x_local, beta, b_local, y_local, 0);
 #ifdef HYPRE_USE_CUDA
+   y_local->bring_from_device=1;
    POP_RANGE
 #endif
 #ifdef HYPRE_PROFILE
@@ -239,10 +242,18 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #endif
 
 #ifdef HYPRE_USE_CUDA
+   int ii;
    PUSH_RANGE_PAYLOAD("PMV MV 2",0,hypre_CSRMatrixNumRows(offd))
    if (num_cols_offd) {
-     if (y_local->ref_count==1)hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,offd,x_tmp,1.0,y_local,y_local,0,0.3); 
-     else hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local); 
+     if (y_local->ref_count==1){
+       y_local->dev->send_to_device=0; // =0 means y_local will not be copied onto the device
+
+       //cudaDeviceSynchronize();
+       //PrintDeviceVec(y_local->dev->data,5,0);
+       //for (ii=0;ii<5;ii++)printf("Host %d %lf\n",ii,y_local->data[ii]);
+       hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,offd,x_tmp,1.0,y_local,y_local,0,0.65); 
+       y_local->dev->send_to_device=1;
+     } else hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local); 
    } else {
      y_local->ref_count++;
    }
@@ -266,7 +277,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_PACK_UNPACK] += hypre_MPI_Wtime();
 #endif
-
+   //printf("************* PAR_CSR_MATVEC EXIT************************************\n");
    return ierr;
 }
 

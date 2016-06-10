@@ -15,4 +15,5 @@ typedef struct cuda_Vector{
   HYPRE_Complex  *data;
   HYPRE_Int offset1,offset2;
   //HYPRE_Int registered;
+  HYPRE_Int send_to_device;
 } cuda_Vector;

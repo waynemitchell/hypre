@@ -25,11 +25,18 @@ void dummy(double *a, double *b,double *c, int num_rows){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i<10) printf("Hello world %d %lf %lf %lf\n",num_rows,a[0],b[0],c[0]);
 }
+
+__global__
+void PrintDeviceArrayKernel(double *a,int num_rows){
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i<num_rows) printf("PrintARRAYDEVICE %d %lf\n",i,a[i]);
+}
+  
 extern "C"{
 __global__
-void VecScaleKernel(double *u, double *v, double *l1_norm, int num_rows){
+void VecScaleKernel(double *__restrict__ u, double *__restrict__ v, double *__restrict__ l1_norm, int num_rows){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  //if (i<10) printf("%d %lf %lf %lf\n",i,u[i],v[i],l1_norm[i]);
+  //if (i<5) printf("DEVICE %d %lf %lf %lf\n",i,u[i],v[i],l1_norm[i]);
   if (i<num_rows){
     u[i]+=v[i]/l1_norm[i];
     //if (i==0) printf("Diff Device %d %lf %lf %lf\n",i,u[i],v[i],l1_norm[i]);
@@ -42,12 +49,12 @@ extern "C"{
     int num_blocks=num_rows/32+1;
     //printf("Vecscale in Kernale call %d %d = %d %d\n",num_blocks,num_rows,num_blocks*32,sizeof(int));
     //printf("ARG Pointers %p %p %p\n",u,v,l1_norm);
-    gpuErrchk2(cudaPeekAtLastError());
-    gpuErrchk2(cudaDeviceSynchronize());
+    //gpuErrchk2(cudaPeekAtLastError());
+    //gpuErrchk2(cudaDeviceSynchronize());
     VecScaleKernel<<<num_blocks,32,0,s>>>(u,v,l1_norm,num_rows);
     //dummy<<<num_blocks,32,0,s>>>(u,v,l1_norm,num_rows);
-    gpuErrchk2(cudaPeekAtLastError());
-    gpuErrchk2(cudaDeviceSynchronize());
+    //gpuErrchk2(cudaPeekAtLastError());
+    //gpuErrchk2(cudaDeviceSynchronize());
   }
 }
 
@@ -56,5 +63,16 @@ extern "C"{
     //int num_blocks=num_rows/32+1;
     //printf("Vecscale %d %d = %d \n",num_blocks,num_rows,num_blocks*32);
     VecScaleKernelGSL<<<1024,32,0,s>>>(u,v,l1_norm,num_rows);
+  }
+}
+
+extern "C"{
+  void PrintDeviceVec(double *u, int num_rows,cudaStream_t s){
+    int num_blocks=num_rows/32+1;
+    //printf("Vecscale in Kernale call %d %d = %d %d\n",num_blocks,num_rows,num_blocks*32,sizeof(int));
+    //printf("ARG Pointers %p %p %p\n",u,v,l1_norm);
+    //gpuErrchk2(cudaPeekAtLastError());
+    //gpuErrchk2(cudaDeviceSynchronize());
+    PrintDeviceArrayKernel<<<num_blocks,32,0,s>>>(u,num_rows);
   }
 }

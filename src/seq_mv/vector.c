@@ -525,6 +525,8 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
     hypre_VectorDataDevice(vector)=NULL;
     vector->dev->offset1=-1;
     vector->dev->offset2=-1;
+    vector->dev->send_to_device=1; // Default set to copy to device
+    vector->bring_from_device=1;  // Default set to copy from device
     //printf("Vector mapped %p\n",hypre_VectorDevice(vector));
   } else {
     //printf("Call to map with valid device pointer %p\n",hypre_VectorDevice(vector));
@@ -601,6 +603,13 @@ void hypre_VectorD2HAsyncPartial(hypre_Vector *vector,size_t size,cudaStream_t s
   gpuErrchk(cudaMemcpyAsync(hypre_VectorData(vector),hypre_VectorDataDevice(vector),
 		   (size_t)(size*sizeof(HYPRE_Complex)), 
 			    cudaMemcpyDeviceToHost,s));
+  POP_RANGE;
+}
+void hypre_VectorH2DCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s){
+  PUSH_RANGE("VecDataXSend",2);
+  gpuErrchk(cudaMemcpyAsync(hypre_VectorDataDevice(dest)+offset,hypre_VectorData(src)+offset,
+		       (size_t)(size*sizeof(HYPRE_Complex)), 
+		       cudaMemcpyHostToDevice,s));
   POP_RANGE;
 }
 void hypre_VectorD2HCrossAsync(hypre_Vector *dest, hypre_Vector *src,int offset, int size,cudaStream_t s){
