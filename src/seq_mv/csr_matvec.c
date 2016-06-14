@@ -1206,7 +1206,13 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid( HYPRE_Complex    alpha,
    static int first_call=0;
    if (!first_call){
      first_call=1;
-     gpuErrchk4(cudaStreamCreate(&s));
+     // get the range of stream priorities for this device
+     int priority_high, priority_low;
+     gpuErrchk4(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
+     // create streams with highest priority
+
+     gpuErrchk4(cudaStreamCreateWithPriority(&s, cudaStreamNonBlocking, priority_high));
+     //gpuErrchk4(cudaStreamCreate(&s));
    }
 
    
@@ -1401,13 +1407,13 @@ hypre_CSRMatrixMatvecStrip( HYPRE_Complex    alpha,
   return ierr;
 }
 HYPRE_Int
-hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
+hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
                                  hypre_CSRMatrix *A,
                                  hypre_Vector    *x,
                                  HYPRE_Complex    beta,
                                  hypre_Vector    *b,
                                  hypre_Vector    *y,
-					HYPRE_Int        offset1,HYPRE_Real fraction     )
+				 HYPRE_Int        offset1,HYPRE_Real fraction     )
 {
   /* This version computes the bottom section of the product on the host and 
      sends the top half to the device.
@@ -1492,16 +1498,11 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
    //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d oFFSET %d\n",A->num_rows,A->num_nonzeros,offset2);
    //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
    if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
-   if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
-   if (!hypre_VectorDevice(b)) hypre_VectorMapToDevice(b);
-   if (!hypre_VectorDevice(y)) hypre_VectorMapToDevice(y);
+ 
+
+
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
-   b->dev->offset1=offset1;
-   b->dev->offset2=offset2;
-   y->dev->offset1=offset1;
-   y->dev->offset2=offset2;
-   x->dev->offset1=offset1;
-   x->dev->offset2=offset2;
+   
    if (!hypre_CSRMatrixCopiedToDevice(A)){
      hypre_CSRMatrixH2DAsyncPartial(A,fraction,s);
      hypre_CSRMatrixCopiedToDevice(A)=1;
@@ -1527,13 +1528,22 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
 #endif
     // WARNING:: assumes that A is static and doesnot change 
   }
+   if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
    hypre_VectorH2DAsync(x,s);
+   if (!hypre_VectorDevice(b)) hypre_VectorMapToDevice(b);
    if (b->dev->send_to_device){
      //printf("COpying b to device %lf %lf %lf %lf %lf\n",b->data[0],b->data[1],b->data[2],b->data[3],b->data[4]);
      //hypre_VectorH2DAsyncPartial(b,offset2-offset1,s); // PBUGS if offset1 !=0
      hypre_VectorH2DCrossAsync(y,b,offset1,offset2-offset1,s); 
    } //else  printf("NOT COpying b to device %lf %lf %lf %lf %lf\n",b->data[0],b->data[1],b->data[2],b->data[3],b->data[4]);
    //hypre_VectorH2DAsync(b,s);
+   if (!hypre_VectorDevice(y)) hypre_VectorMapToDevice(y);
+   b->dev->offset1=offset1;
+   b->dev->offset2=offset2;
+   y->dev->offset1=offset1;
+   y->dev->offset2=offset2;
+   x->dev->offset1=offset1;
+   x->dev->offset2=offset2;
   cusparseStatus_t status;
 #ifndef HYPRE_USE_CUDA_HYB
   status=cusparseSetStream(hypre_CSRMatrixHandle(A) ,s);
@@ -1572,9 +1582,23 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
   // Call the host code
   hypre_CSRMatrixMatvecStrip( alpha,A,x,beta,b,y,offset2,A->num_rows);
 			    
-  cudaDeviceSynchronize();
+  //cudaDeviceSynchronize();
 
   POP_RANGE
   return ierr;
+}
+HYPRE_Int
+hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
+                                 hypre_CSRMatrix *A,
+                                 hypre_Vector    *x,
+                                 HYPRE_Complex    beta,
+                                 hypre_Vector    *b,
+                                 hypre_Vector    *y,
+					HYPRE_Int        offset1,HYPRE_Real fraction     )
+{
+
+  HYPRE_Int retval=hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( alpha,A,x,beta,b,y,offset1,fraction);
+  gpuErrchk4(cudaDeviceSynchronize());
+  return retval;
 }
 #endif

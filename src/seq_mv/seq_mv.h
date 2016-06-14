@@ -234,7 +234,7 @@ typedef struct
   struct cuda_Vector *dev;
   HYPRE_Int ref_count;
   HYPRE_Int bring_from_device;
-
+  HYPRE_Int nosync;
 #endif
 } hypre_Vector;
 
@@ -337,6 +337,14 @@ hypre_CSRMatrixMatvecStrip( HYPRE_Complex    alpha,
 			    hypre_Vector    *b,
 			    hypre_Vector    *y,HYPRE_Int start, HYPRE_Int end     );
 
+HYPRE_Int
+hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
+                                 hypre_CSRMatrix *A,
+                                 hypre_Vector    *x,
+                                 HYPRE_Complex    beta,
+                                 hypre_Vector    *b,
+                                 hypre_Vector    *y,
+					HYPRE_Int        offset ,HYPRE_Real fraction    );
 HYPRE_Int
 hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
                                  hypre_CSRMatrix *A,

@@ -90,7 +90,10 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	static int first_call=0;
 	if (!first_call){
 	  first_call=1;
-	  gpuErrchk3(cudaStreamCreate(&s));
+	  int priority_high, priority_low;
+	  gpuErrchk3(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
+	  gpuErrchk3(cudaStreamCreateWithPriority(&s, cudaStreamNonBlocking, priority_low));
+	  //gpuErrchk3(cudaStreamCreate(&s));
 	}
 	#define CUTOFF 0000
 	PUSH_RANGE("L1-SJacobi",0);
@@ -106,8 +109,10 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   else
 	     send_l1_norm=1;
 	 } else send_l1_norm=1;
-
-	 //send_l1_norm=0; // No scaling on GPU
+#define SEND_NORMS
+#ifndef SEND_NORMS
+	 send_l1_norm=0; // No scaling on GPU
+#endif
 	 //printf("RELAX flag = %d diag=-dev= %p\n",send_l1_norm,diag->dev);
 	 int registered=0;
 	 if (send_l1_norm){
@@ -122,7 +127,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	     size_t new_size;
 	     size_t pgz=getpagesize();
 	     size_t size=(size_t)(num_rows*sizeof(HYPRE_Real));
-	     if ((size>pgz)){
+	     if ((size>pgz*1000000000)){ // Essentially off
 	       new_size=((size+pgz-1)/pgz)*pgz;
 	       //printf("Planning to register mem of size %d to %d\n",size,new_size);
 	       // Note this memregister fails after a few calls when trying to re-reister 
@@ -141,9 +146,9 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	     //gpuErrchk3(cudaMemcpyAsync(l1_norms_device,l1_norms,
 	     //			     (size_t)(num_rows*sizeof(HYPRE_Real)), 
 	     //			     cudaMemcpyHostToDevice,s));
-	   gpuErrchk3(cudaMemcpyAsync(l1_norms_device,l1_norms,
-				     (size_t)(send_size*sizeof(HYPRE_Real)), 
-				      cudaMemcpyHostToDevice,s));
+	     //gpuErrchk3(cudaMemcpyAsync(l1_norms_device,l1_norms,
+	     //			     (size_t)(send_size*sizeof(HYPRE_Real)), 
+	     //			      cudaMemcpyHostToDevice,s));
 	   POP_RANGE
 	     }
 	 }
@@ -151,12 +156,14 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	 PUSH_RANGE("V-COPY",5)
          hypre_ParVectorCopy(f,v);
 	 POP_RANGE
+	 
+	 hypre_ParVectorLocalVector(v)->nosync=1;
          hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
 	 if (hypre_VectorDevice(hypre_ParVectorLocalVector(v))&&hypre_ParVectorLocalVector(u)->dev){
 	   offset1=hypre_ParVectorLocalVector(v)->dev->offset1;
 	   offset2=hypre_ParVectorLocalVector(v)->dev->offset2;
 	 } else offset2=-1;
-	
+	 hypre_ParVectorLocalVector(v)->nosync=0;
 	 //printf("MATVECdone %p %p OFFSET %d VEC Size = %d\n",hypre_ParVectorLocalVector(u)->dev,hypre_ParVectorLocalVector(v)->dev,offset2,hypre_VectorSize(hypre_ParVectorLocalVector(u)));
          /* u += w D^{-1}(f - A u), where D_ii = ||A(i,:)||_1 */
 	 //offset2=-1;
@@ -172,7 +179,15 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   if (hypre_VectorDataDevice(hypre_ParVectorLocalVector(u))&&hypre_VectorDataDevice(hypre_ParVectorLocalVector(v))){
 	     //printf("VECSCALE Pointers Device %p %p %p OFFSET %d\n",u_device,v_device,l1_norms_device,offset2);
 	     gpuErrchk3(cudaDeviceSynchronize()); // To make sure l1_norms_device is avalable and the matvecs are done
-	  VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
+	     //VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
+	     hypre_CSRMatrix   *diag   = hypre_ParCSRMatrixDiag(A);
+	     hypre_CSRMatrix   *offd   = hypre_ParCSRMatrixOffd(A);
+	     if (send_l1_norm)
+	  VecScaleWithNorms(u_device+offset1,v_device+offset1,l1_norms_device+offset1,
+		   diag->dev->i+offset1,diag->dev->data+offset1,offd->dev->i+offset1,offd->dev->data+offset1,
+		   offset2-offset1,s);
+	     else
+	       VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
 	  //hypre_ParVectorLocalVector(v)->ref_count=0;
 	   } else { 
 	     printf("ERROR:: Problem found NULL VECTORs\n");
