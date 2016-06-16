@@ -213,8 +213,9 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #define CUDA_MATVEC_CUTOFF 5000000		
     // The use of async here could be dangerous is some message passing does not before the x_tmp is
   // copied to the device.
+   
   if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
-    hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( alpha, diag, x_local, beta, b_local, y_local, 0,0.65);
+    hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( alpha, diag, x_local, beta, b_local, y_local, 0,y_local->dev->fraction);
   else
     hypre_CSRMatrixMatvecOutOfPlace( alpha, diag, x_local, beta, b_local, y_local, 0);
 #else
@@ -259,9 +260,9 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
        //PrintDeviceVec(y_local->dev->data,5,0);
        //for (ii=0;ii<5;ii++)printf("Host %d %lf\n",ii,y_local->data[ii]);
        if (y_local->nosync)
-	 hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async(alpha,offd,x_tmp,1.0,y_local,y_local,0,0.65); 
+	 hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async(alpha,offd,x_tmp,1.0,y_local,y_local,0,y_local->dev->fraction); 
        else
-	 hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,offd,x_tmp,1.0,y_local,y_local,0,0.65); 
+	 hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,offd,x_tmp,1.0,y_local,y_local,0,y_local->dev->fraction); 
        y_local->dev->send_to_device=1;
      } else hypre_CSRMatrixMatvec( alpha, offd, x_tmp, 1.0, y_local); 
    } else {

@@ -398,6 +398,7 @@ HYPRE_Int HYPRE_VectorInitialize ( HYPRE_Vector vector );
 HYPRE_Int HYPRE_VectorPrint ( HYPRE_Vector vector , char *file_name );
 HYPRE_Vector HYPRE_VectorRead ( char *file_name );
 
+
 /* mapped_matrix.c */
 hypre_MappedMatrix *hypre_MappedMatrixCreate ( void );
 HYPRE_Int hypre_MappedMatrixDestroy ( hypre_MappedMatrix *matrix );
@@ -441,6 +442,7 @@ HYPRE_Real hypre_SeqVectorInnerProd ( hypre_Vector *x , hypre_Vector *y );
 HYPRE_Complex hypre_VectorSumElts ( hypre_Vector *vector );
 #ifdef HYPRE_USE_CUDA
 void hypre_VectorMapToDevice(hypre_Vector *vector);
+void hypre_VectorDevInit(hypre_Vector *vector);
 HYPRE_Int hypre_VectorH2D(hypre_Vector *vector);
 void hypre_VectorD2H(hypre_Vector *vector);
 void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int size);

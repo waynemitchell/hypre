@@ -86,13 +86,14 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
       if (relax_type == 1) /* l1-scaled Jacobi */
       {
 	//printf("**************************** LS1-JACOBI ENTER ************************\n");
-	static cudaStream_t s;
+	static cudaStream_t s0,s1;
 	static int first_call=0;
 	if (!first_call){
 	  first_call=1;
 	  int priority_high, priority_low;
 	  gpuErrchk3(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
-	  gpuErrchk3(cudaStreamCreateWithPriority(&s, cudaStreamNonBlocking, priority_low));
+	  gpuErrchk3(cudaStreamCreateWithPriority(&s0, cudaStreamNonBlocking, priority_high));
+	  gpuErrchk3(cudaStreamCreateWithPriority(&s1, cudaStreamNonBlocking, priority_low));
 	  //gpuErrchk3(cudaStreamCreate(&s));
 	}
 	#define CUTOFF 0000
@@ -115,8 +116,9 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 #endif
 	 //printf("RELAX flag = %d diag=-dev= %p\n",send_l1_norm,diag->dev);
 	 int registered=0;
+	 //hypre_ParVectorLocalVector(v)->dev->fraction=0.7;
 	 if (send_l1_norm){
-	   int send_size=num_rows*0.65; // PBUGS WARNING HARDWIRED
+	   int send_size=num_rows*hypre_ParVectorLocalVector(v)->dev->fraction; 
 	   if (num_rows>CUTOFF){
 	     
 	     PUSH_RANGE("NORM_COPY",1);
@@ -158,6 +160,8 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	 POP_RANGE
 	 
 	 hypre_ParVectorLocalVector(v)->nosync=1;
+	 hypre_ParVectorLocalVector(v)->dev->s0=s0;
+	 hypre_ParVectorLocalVector(v)->dev->s1=s1;
          hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
 	 if (hypre_VectorDevice(hypre_ParVectorLocalVector(v))&&hypre_ParVectorLocalVector(u)->dev){
 	   offset1=hypre_ParVectorLocalVector(v)->dev->offset1;
@@ -178,23 +182,23 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   
 	   if (hypre_VectorDataDevice(hypre_ParVectorLocalVector(u))&&hypre_VectorDataDevice(hypre_ParVectorLocalVector(v))){
 	     //printf("VECSCALE Pointers Device %p %p %p OFFSET %d\n",u_device,v_device,l1_norms_device,offset2);
-	     gpuErrchk3(cudaDeviceSynchronize()); // To make sure l1_norms_device is avalable and the matvecs are done
+	     //gpuErrchk3(cudaDeviceSynchronize()); // To make sure l1_norms_device is avalable and the matvecs are done
 	     //VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
 	     hypre_CSRMatrix   *diag   = hypre_ParCSRMatrixDiag(A);
 	     hypre_CSRMatrix   *offd   = hypre_ParCSRMatrixOffd(A);
 	     if (send_l1_norm)
 	  VecScaleWithNorms(u_device+offset1,v_device+offset1,l1_norms_device+offset1,
 		   diag->dev->i+offset1,diag->dev->data+offset1,offd->dev->i+offset1,offd->dev->data+offset1,
-		   offset2-offset1,s);
+		   offset2-offset1,s1);
 	     else
-	       VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s);
+	       VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s1);
 	  //hypre_ParVectorLocalVector(v)->ref_count=0;
 	   } else { 
 	     printf("ERROR:: Problem found NULL VECTORs\n");
 	     exit(1);
 	   }
 	   //printf("VECSCALE done\n");
-	   hypre_VectorD2HAsyncPartial(hypre_ParVectorLocalVector(u),(size_t)(offset2-offset1),s);
+	   hypre_VectorD2HAsyncPartial(hypre_ParVectorLocalVector(u),(size_t)(offset2-offset1),s1);
 	   // DEBUG AREA
 	   //double *u_copy;
 	   //u_copy = hypre_CTAlloc(double,num_rows);
@@ -218,7 +222,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   hypre_ParVectorLocalVector(v)->dev->offset2=-1;
 	   hypre_ParVectorLocalVector(u)->dev->offset1=-1;
 	   hypre_ParVectorLocalVector(u)->dev->offset2=-1;
-	   cudaStreamSynchronize(s);
+	   cudaStreamSynchronize(s1);
 	   
 	 } else {
 	   for (i = 0; i < num_rows; i++)

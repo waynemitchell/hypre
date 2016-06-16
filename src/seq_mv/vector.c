@@ -39,6 +39,9 @@ hypre_SeqVectorCreate( HYPRE_Int size )
    /* set defaults */
    hypre_VectorOwnsData(vector) = 1;
 
+#ifdef HYPRE_USE_CUDA
+   hypre_VectorDevInit(vector);
+#endif
    return vector;
 }
 
@@ -116,7 +119,9 @@ if (hypre_VectorDevice(vector)){
     else
        ++ierr;
 
-
+#ifdef HYPRE_USE_CUDA
+   hypre_VectorDevInit(vector);
+#endif
     return ierr;
  }
 
@@ -535,6 +540,9 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
     //printf("Call to map with valid device pointer %p\n",hypre_VectorDevice(vector));
   }
   if (!hypre_VectorDataDevice(vector)){
+    hypre_VectorDevice(vector)->mapped=1;
+    gpuErrchk(cudaStreamCreate(&vector->dev->s0));
+    gpuErrchk(cudaStreamCreate(&vector->dev->s1));
     size_t size=hypre_VectorSize(vector)*sizeof(HYPRE_Complex);
     size_t pgz=getpagesize();
     size=((size+pgz-1)/pgz)*pgz;
@@ -548,7 +556,22 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
        }
   }
 }
-
+void hypre_VectorDevInit(hypre_Vector *vector){
+  if (!hypre_VectorDevice(vector)){
+    hypre_VectorDevice(vector)=hypre_CTAlloc(cuda_Vector, 1);
+    hypre_VectorDataDevice(vector)=NULL;
+    vector->dev->offset1=-1;
+    vector->dev->offset2=-1;
+    vector->dev->send_to_device=1; // Default set to copy to device
+    vector->bring_from_device=1;  // Default set to copy from device
+    vector->nosync=0; // Default is to sync
+    vector->dev->mapped=0; 
+    vector->dev->s0=0;
+    vector->dev->s1=0;
+    vector->dev->fraction=0.70; // Default 70% in favor of the device
+    //printf("Vector mapped %p\n",hypre_VectorDevice(vector));
+  } 
+}
 // Synchronous vector copy
 
 HYPRE_Int hypre_VectorH2D(hypre_Vector *vector){
