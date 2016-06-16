@@ -19,4 +19,8 @@ typedef struct cuda_Vector{
   HYPRE_Int send_to_device;
   cudaStream_t s0,s1;
   cudaEvent_t event;
+
+  HYPRE_Int ref_count;
+  HYPRE_Int bring_from_device;
+  HYPRE_Int nosync;
 } cuda_Vector;

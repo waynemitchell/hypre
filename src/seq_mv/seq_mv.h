@@ -67,7 +67,6 @@ typedef struct hypre_CSRMatrix
 
 #ifdef HYPRE_USE_CUDA
   struct cuda_CSRMatrix *dev;
-  
 #endif
 
 } hypre_CSRMatrix;
@@ -232,9 +231,6 @@ typedef struct
 
 #ifdef HYPRE_USE_CUDA
   struct cuda_Vector *dev;
-  HYPRE_Int ref_count;
-  HYPRE_Int bring_from_device;
-  HYPRE_Int nosync;
 #endif
 } hypre_Vector;
 

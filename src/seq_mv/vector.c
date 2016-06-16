@@ -533,8 +533,8 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
     vector->dev->offset1=-1;
     vector->dev->offset2=-1;
     vector->dev->send_to_device=1; // Default set to copy to device
-    vector->bring_from_device=1;  // Default set to copy from device
-    vector->nosync=0; // Default is to sync
+    vector->dev->bring_from_device=1;  // Default set to copy from device
+    vector->dev->nosync=0; // Default is to sync
     //printf("Vector mapped %p\n",hypre_VectorDevice(vector));
   } else {
     //printf("Call to map with valid device pointer %p\n",hypre_VectorDevice(vector));
@@ -563,8 +563,8 @@ void hypre_VectorDevInit(hypre_Vector *vector){
     vector->dev->offset1=-1;
     vector->dev->offset2=-1;
     vector->dev->send_to_device=1; // Default set to copy to device
-    vector->bring_from_device=1;  // Default set to copy from device
-    vector->nosync=0; // Default is to sync
+    vector->dev->bring_from_device=1;  // Default set to copy from device
+    vector->dev->nosync=0; // Default is to sync
     vector->dev->mapped=0; 
     vector->dev->s0=0;
     vector->dev->s1=0;
