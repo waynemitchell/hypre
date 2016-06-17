@@ -43,7 +43,9 @@ FILES =\
  multiblock_matrix.c\
  vector.c
 
+CFILES = vecscale.cu
 OBJS = ${FILES:.c=.o}
+COBJS = ${CFILES:.cu=.o}
 
 SONAME = libHYPRE_seq_mv-${HYPRE_RELEASE_VERSION}.so
 
@@ -71,9 +73,9 @@ distclean: clean
 # Rules
 ##################################################################
 
-libHYPRE_seq_mv.a: ${OBJS}
+libHYPRE_seq_mv.a: ${OBJS} ${COBJS}
 	@echo  "Building $@ ... "
-	${AR} $@ ${OBJS}
+	${AR} $@ ${OBJS} ${COBJS}
 	${RANLIB} $@
 
 libHYPRE_seq_mv.so: ${OBJS}
