@@ -273,8 +273,8 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
    hypre_profile_times[HYPRE_TIMER_ID_PACK_UNPACK] -= hypre_MPI_Wtime();
 #endif
 
-   //hypre_SeqVectorDestroy(x_tmp);
-   //x_tmp = NULL;
+   hypre_SeqVectorDestroy(x_tmp);
+   x_tmp = NULL;
    if (!use_persistent_comm)
    {
       for ( jv=0; jv<num_vectors; ++jv ) hypre_TFree(x_buf_data[jv]);

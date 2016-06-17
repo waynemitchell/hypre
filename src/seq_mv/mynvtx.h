@@ -37,4 +37,5 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #else
 #define PUSH_RANGE(name,cid)
 #define POP_RANGE
+#define PUSH_RANGE_PAYLOAD(name,cid,load)
 #endif

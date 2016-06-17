@@ -19,15 +19,7 @@
 #include "seq_mv.h"
 #include <assert.h>
 #include <stdio.h>
-#define gpuErrchk4(ans) { gpuAssert4((ans), __FILE__, __LINE__); }
-inline void gpuAssert4(cudaError_t code, const char *file, int line)
-{
-   if (code != cudaSuccess) 
-   {
-     printf("GPUassert: %s %d\n", file, line);
-     printf("GPUassert: ERROR STRING %s \n", cudaGetErrorString(code));
-   }
-}
+
 
 /*--------------------------------------------------------------------------
  * hypre_CSRMatrixMatvec
@@ -1209,11 +1201,11 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid( HYPRE_Complex    alpha,
      first_call=1;
      // get the range of stream priorities for this device
      int priority_high, priority_low;
-     //gpuErrchk4(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
+     //gpuErrchk(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
      // create streams with highest priority
 
-     //gpuErrchk4(cudaStreamCreateWithPriority(&s, cudaStreamNonBlocking, priority_high));
-     //gpuErrchk4(cudaStreamCreate(&s));
+     //gpuErrchk(cudaStreamCreateWithPriority(&s, cudaStreamNonBlocking, priority_high));
+     //gpuErrchk(cudaStreamCreate(&s));
    }
    
    /*---------------------------------------------------------------------
@@ -1566,8 +1558,8 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
     // Insert event in stream s0 and make s1 wait on it. This is to make sure that
     // the data for Vecscale has been computed.
     //cudaEvent_t event;
-    gpuErrchk4(cudaEventCreateWithFlags(&(y->dev->event),cudaEventDisableTiming));
-    gpuErrchk4(cudaEventRecord(y->dev->event,s0));
+    gpuErrchk(cudaEventCreateWithFlags(&(y->dev->event),cudaEventDisableTiming));
+    gpuErrchk(cudaEventRecord(y->dev->event,s0));
     gpuErrchk(cudaStreamWaitEvent(s1,y->dev->event,0));
    // End code for syncing Matvec & Vecscale
     
@@ -1591,7 +1583,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
 					HYPRE_Int        offset1,HYPRE_Real fraction     )
 {
   HYPRE_Int retval=hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( alpha,A,x,beta,b,y,offset1,fraction);
-  gpuErrchk4(cudaDeviceSynchronize());
+  gpuErrchk(cudaDeviceSynchronize());
   return retval;
 }
 #endif

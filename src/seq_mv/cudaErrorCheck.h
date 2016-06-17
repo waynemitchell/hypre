@@ -1,6 +1,7 @@
 #ifndef __cusparseErrorCheck__
 #define __cusparseErrorCheck__
 #include <stdio.h>
+#include <cuda_runtime_api.h>
 static const char *cusparseErrorCheck(cusparseStatus_t error)
 {
     switch (error)
@@ -36,19 +37,21 @@ static const char *cusparseErrorCheck(cusparseStatus_t error)
     return "Congrats::Undefined ERRROR";
 }
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-static inline void gpuAssert(cudaError_t code, const char *file, int line)
+extern inline void gpuAssert(cudaError_t code, const char *file, int line)
 {
    if (code != cudaSuccess) 
    {
-     printf("GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+     fprintf(stderr,"CUDA ERROR ( Code = %d) in line %d of file %s\n",code,line,file);
+     fprintf(stderr,"CUDA ERROR : %s \n", cudaGetErrorString(code));
    }
 }
 #define cusparseErrchk(ans) { cusparseAssert((ans), __FILE__, __LINE__); }
-static inline void cusparseAssert(cusparseStatus_t code, const char *file, int line)
+extern inline void cusparseAssert(cusparseStatus_t code, const char *file, int line)
 {
    if (code != CUSPARSE_STATUS_SUCCESS) 
    {
-     fprintf(stderr,"cusparseAssert: %s %s %d\n", cusparseErrorCheck(code), file, line);
+     fprintf(stderr,"CUSPARSE ERROR  ( Code = %d) IN CUDA CALL line %d of file %s\n",code,line,file);
+     fprintf(stderr,"CUSPARSE ERROR : %s \n", cusparseErrorCheck(code));
    }
 }
 int PointerType(const void *ptr);

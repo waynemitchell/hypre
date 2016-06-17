@@ -20,15 +20,7 @@
 #ifdef HYPRE_USE_CUDA
 void VecScale(double *u, double *v, double *l1_norm, int num_rows,cudaStream_t s);
 void VecScaleGSL(double *u, double *v, double *l1_norm, int num_rows,cudaStream_t s);
-#define gpuErrchk3(ans) { gpuAssert3((ans), __FILE__, __LINE__); }
-inline void gpuAssert3(cudaError_t code, const char *file, int line)
-{
-   if (code != cudaSuccess) 
-   {
-     printf("ERROR in line %d pf file %s\n", line,file);
-     printf("GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-   }
-}
+
 #endif
 /*--------------------------------------------------------------------------
  * hypre_ParCSRRelax
@@ -91,9 +83,9 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	if (!first_call){
 	  first_call=1;
 	  int priority_high, priority_low;
-	  gpuErrchk3(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
-	  gpuErrchk3(cudaStreamCreateWithPriority(&s0, cudaStreamNonBlocking, priority_high));
-	  gpuErrchk3(cudaStreamCreateWithPriority(&s1, cudaStreamNonBlocking, priority_low));
+	  gpuErrchk(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
+	  gpuErrchk(cudaStreamCreateWithPriority(&s0, cudaStreamNonBlocking, priority_high));
+	  gpuErrchk(cudaStreamCreateWithPriority(&s1, cudaStreamNonBlocking, priority_low));
 	}
 	PUSH_RANGE("L1-SJacobi",0);
          HYPRE_Int i, num_rows = hypre_ParCSRMatrixNumRows(A);
@@ -113,7 +105,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	   int send_size=num_rows*hypre_ParVectorLocalVector(v)->dev->fraction; 
 	     
 	   PUSH_RANGE("NORM_COPY",1);
-	   gpuErrchk3(cudaMalloc((void**)&l1_norms_device,send_size*sizeof(HYPRE_Real)));
+	   gpuErrchk(cudaMalloc((void**)&l1_norms_device,send_size*sizeof(HYPRE_Real)));
 	   memalloc=1;
 	 }
 #endif
