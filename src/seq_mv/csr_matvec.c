@@ -812,8 +812,8 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
   //printf("Entre hypre_CSRMatrixMatvec CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
   //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
   if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
-  if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
-  if (!hypre_VectorDevice(y)) hypre_VectorMapToDevice(y);
+  if (!hypre_VectorDevice(x)->mapped) hypre_VectorMapToDevice(x);
+  if (!hypre_VectorDevice(y)->mapped) hypre_VectorMapToDevice(y);
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
   y->dev->ref_count++;
   if (!hypre_CSRMatrixCopiedToDevice(A)){
