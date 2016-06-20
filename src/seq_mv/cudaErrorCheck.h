@@ -2,7 +2,7 @@
 #define __cusparseErrorCheck__
 #include <stdio.h>
 #include <cuda_runtime_api.h>
-static const char *cusparseErrorCheck(cusparseStatus_t error)
+extern inline const char *cusparseErrorCheck(cusparseStatus_t error)
 {
     switch (error)
     {

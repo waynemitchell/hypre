@@ -166,13 +166,17 @@ hypre_BoomerAMGSolve( void               *amg_vdata,
         hypre_ParVectorCopy(F_array[0], Residual );
         if (tol > 0)
 	   hypre_ParCSRMatrixMatvec(alpha, A_array[0], U_array[0], beta, Residual );
+	PUSH_RANGE("InnerProduct1",3)
         resid_nrm = sqrt(hypre_ParVectorInnerProd( Residual, Residual ));
+	POP_RANGE
      }
      else {
         hypre_ParVectorCopy(F_array[0], Vtemp);
         if (tol > 0)
            hypre_ParCSRMatrixMatvec(alpha, A_array[0], U_array[0], beta, Vtemp);
+	PUSH_RANGE("InnerProduct2",3)
         resid_nrm = sqrt(hypre_ParVectorInnerProd(Vtemp, Vtemp));
+	POP_RANGE
      }
 
      /* Since it is does not diminish performance, attempt to return an error flag
@@ -197,7 +201,9 @@ hypre_BoomerAMGSolve( void               *amg_vdata,
      }
 
      resid_nrm_init = resid_nrm;
+     PUSH_RANGE("InnerProduct3",3)
      rhs_norm = sqrt(hypre_ParVectorInnerProd(f, f));
+     POP_RANGE
      if (rhs_norm)
      {
        relative_resid = resid_nrm_init / rhs_norm;
@@ -252,7 +258,9 @@ hypre_BoomerAMGSolve( void               *amg_vdata,
         }
         else {
 	   hypre_ParCSRMatrixMatvecOutOfPlace(alpha, A_array[0], U_array[0], beta, F_array[0], Vtemp);
+	   PUSH_RANGE("InnerProduct-4",3)
            resid_nrm = sqrt(hypre_ParVectorInnerProd(Vtemp, Vtemp));
+	   POP_RANGE
         }
 
         if (old_resid) conv_factor = resid_nrm / old_resid;

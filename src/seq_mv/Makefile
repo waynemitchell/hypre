@@ -41,7 +41,8 @@ FILES =\
  HYPRE_vector.c\
  mapped_matrix.c\
  multiblock_matrix.c\
- vector.c
+ vector.c \
+ nvtxinstrument.c
 
 CFILES = vecscale.cu
 OBJS = ${FILES:.c=.o}

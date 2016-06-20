@@ -273,6 +273,8 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
    hypre_profile_times[HYPRE_TIMER_ID_PACK_UNPACK] -= hypre_MPI_Wtime();
 #endif
 
+   // The 2 lines below mess up overlap of the Vecscale compute wita D2H transfer.
+   // Probably need a mechanism to do deferred destructor calls or a memory pool
    hypre_SeqVectorDestroy(x_tmp);
    x_tmp = NULL;
    if (!use_persistent_comm)

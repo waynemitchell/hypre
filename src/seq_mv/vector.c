@@ -527,6 +527,10 @@ HYPRE_Complex hypre_VectorSumElts( hypre_Vector *vector )
 }
 #ifdef HYPRE_USE_CUDA
 void hypre_VectorMapToDevice(hypre_Vector *vector){
+  if (vector->num_vectors!=1){
+    fprintf(stderr,"ERROR:: CUDA routines cannot handle mult-vectors\n");
+    exit(2);
+  }
   if (!hypre_VectorDevice(vector)){
     hypre_VectorDevice(vector)=hypre_CTAlloc(cuda_Vector, 1);
     hypre_VectorDataDevice(vector)=NULL;
