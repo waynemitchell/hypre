@@ -27,6 +27,10 @@
 #include "cudaErrorCheck.h"
 #include "csr_cuda.h"
 #include "mynvtx.h"
+#else
+#define PUSH_RANGE(name,cid)
+#define POP_RANGE
+#define PUSH_RANGE_PAYLOAD(name,cid,load)
 #endif
 #ifdef __cplusplus
 extern "C" {

@@ -77,6 +77,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
      	 int memalloc=0;
       if (relax_type == 1) /* l1-scaled Jacobi */
       {
+	HYPRE_Int i, num_rows = hypre_ParCSRMatrixNumRows(A);
 #ifdef HYPRE_USE_CUDA
 	static cudaStream_t s0,s1;
 	static int first_call=0;
@@ -88,7 +89,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	  gpuErrchk(cudaStreamCreateWithPriority(&s1, cudaStreamNonBlocking, priority_low));
 	}
 	PUSH_RANGE("L1-SJacobi",0);
-         HYPRE_Int i, num_rows = hypre_ParCSRMatrixNumRows(A);
+
 	 // Get a copy of l1_norms ready on the device */
 	 int send_l1_norm=0;
 	 hypre_CSRMatrix   *diag   = hypre_ParCSRMatrixDiag(A);
