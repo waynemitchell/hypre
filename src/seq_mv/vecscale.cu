@@ -123,6 +123,16 @@ extern "C"{
 			 int num_rows,cudaStream_t s){
     int tpb=64;
     int num_blocks=num_rows/tpb+1;
+    // Let cuda caluclate gridsize and block size
+    if (0){
+    int minGridSize,blockSize;
+    cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize, 
+					VecScaleKernelWithNorms1, 0, 0); 
+    printf("Grid & Block size for max occupancy Norm1 %d(%d) %d(%d)\n",minGridSize,num_blocks,blockSize,tpb);
+    cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize, 
+                                      VecScaleKernelWithNorms2, 0, 0); 
+    printf("Grid & Block size for max occupancy Norm2 %d(%d) %d(%d)\n",minGridSize,num_blocks,blockSize,tpb);
+    }
     //printf("Vecscale in Kernale call %d %d = %d %d\n",num_blocks,num_rows,num_blocks*32,sizeof(int));
     //printf("ARG Pointers %p %p %p\n",u,v,l1_norm);
     //gpuErrchk2(cudaPeekAtLastError());

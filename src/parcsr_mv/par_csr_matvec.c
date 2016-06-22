@@ -213,7 +213,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #define CUDA_MATVEC_CUTOFF 5000000		
     // The use of async here could be dangerous is some message passing does not before the x_tmp is
   // copied to the device.
-   
+   //cudaDeviceSynchronize();
   if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
     hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( alpha, diag, x_local, beta, b_local, y_local, 0,y_local->dev->fraction);
   else
@@ -228,7 +228,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_HALO_EXCHANGE] -= hypre_MPI_Wtime();
 #endif
-   
+   //cudaDeviceSynchronize();
    if (use_persistent_comm)
    {
 #ifdef HYPRE_USING_PERSISTENT_COMM
@@ -250,6 +250,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #endif
 
 #ifdef HYPRE_USE_CUDA
+   //cudaDeviceSynchronize();
    int ii;
    PUSH_RANGE_PAYLOAD("PMV MV 2",0,hypre_CSRMatrixNumRows(offd))
    if (num_cols_offd) {
@@ -272,9 +273,9 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_PACK_UNPACK] -= hypre_MPI_Wtime();
 #endif
-
-   // The 2 lines below mess up overlap of the Vecscale compute wita D2H transfer.
-   // Probably need a mechanism to do deferred destructor calls or a memory pool
+   //cudaDeviceSynchronize();
+   // The 2 lines below mess up overlap of the Vecscale compute with the D2H transfer.
+   // Needs a mechanism to do deferred destructor calls and/or a memory pool
    hypre_SeqVectorDestroy(x_tmp);
    x_tmp = NULL;
    if (!use_persistent_comm)

@@ -128,7 +128,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	 offset2=hypre_ParVectorLocalVector(v)->dev->offset2;
 
 	 hypre_ParVectorLocalVector(v)->dev->nosync=0;
-
+	 //cudaDeviceSynchronize();
 	 if (hypre_ParVectorLocalVector(v)->dev->ref_count==2){
 	   HYPRE_Real *u_device=hypre_ParVectorLocalVector(u)->dev->data;
 	   HYPRE_Real *v_device=hypre_ParVectorLocalVector(v)->dev->data;
@@ -141,17 +141,17 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 		   offset2-offset1,s1);
 	   else
 	     VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s1);
-
 	   
+	   //cudaDeviceSynchronize();
 	   hypre_VectorD2HAsyncPartial(hypre_ParVectorLocalVector(u),(size_t)(offset2-offset1),s1);
-
+	   //cudaDeviceSynchronize();
 	   POP_RANGE
 	   PUSH_RANGE("VEC_SCALE_HOST",3);
 	   for (i = offset2; i < num_rows; i++)
 	     u_data[i] += v_data[i] / l1_norms[i];
 
 	   POP_RANGE
-	     
+	     //cudaDeviceSynchronize();
 	   cudaStreamSynchronize(s1);
 	   
 	 } else {
