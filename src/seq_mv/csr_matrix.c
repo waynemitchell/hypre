@@ -47,6 +47,8 @@ hypre_CSRMatrixCreate( HYPRE_Int num_rows,
    hypre_CSRMatrixNumRownnz(matrix) = num_rows;
 #ifdef HYPRE_USE_CUDA
    hypre_CSRMatrixDevice(matrix) = NULL;
+   hypre_CSRMatrixDevInit(matrix);
+
 #endif
 
    return matrix;
@@ -680,11 +682,7 @@ HYPRE_Int hypre_CSRMatrixGetLoadBalancedPartitionEnd(hypre_CSRMatrix *A)
   
 void hypre_CSRMatrixMapToDevice(hypre_CSRMatrix *A){
   
-  if (hypre_CSRMatrixDevice(A)!=NULL){
-    printf("ERROR:: Trying to map an already mapped file\n");
-  }
 
-  
   // Allocate memory for the struct for holding all the device pointers
   if (hypre_CSRMatrixDevice(A)==NULL) {
     hypre_CSRMatrixDevice(A)=hypre_CTAlloc(cuda_CSRMatrix, 1);
@@ -692,16 +690,23 @@ void hypre_CSRMatrixMapToDevice(hypre_CSRMatrix *A){
     hypre_CSRMatrixIDevice(A)=NULL;
     hypre_CSRMatrixJDevice(A)=NULL;
     hypre_CSRMatrixCopiedToDevice(A)=0;
+    gpuErrchk(cudaEventCreate(&(A->dev->start_timer)));
+    gpuErrchk(cudaEventCreate(&(A->dev->stop_timer)));
+    A->dev->call_count=0;
+    A->dev->fraction=1.0;
+    A->dev->last_fraction=-1.0;
+    A->dev->mapped=0;
   }
-
+  A->dev->mapped=1;
   // Get a cuSPARSE handle 
   cusparseStatus_t status;
   status= cusparseCreate(&(hypre_CSRMatrixHandle(A)));
   if (status != CUSPARSE_STATUS_SUCCESS) {
     printf("ERROR:: CUSPARSE Library initialization failed\n");
     hypre_CSRMatrixHandle(A)=0;
+    exit(2);
   } 
-  // Create and Set Matrix Desciptor
+  // Create and Set Matrix Descriptor
   status= cusparseCreateMatDescr(&(hypre_CSRMatrixDescr(A))); 
   if (status != CUSPARSE_STATUS_SUCCESS) {
     printf("ERROR:: Matrix descriptor initialization failed\n");
@@ -818,7 +823,52 @@ void hypre_CSRMatrixH2DAsyncPartial(hypre_CSRMatrix *matrix,float frac, cudaStre
   hypre_CSRMatrixJH2DAsyncPartial(matrix,nnz, s);
   
  }
+
+void hypreCSRMatrixH2DUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s){
+  size_t rows=(size_t)(matrix->num_rows*frac);
+  size_t nnz=matrix->i[(int)(matrix->num_rows*frac)];
+  //nnz=hypre_CSRMatrixNumNonzeros(matrix);
+  HYPRE_Int nnz_send=nnz;
+  //printf("H2DAysncPartial rows %d (%d) NNZ %d (%d)\n",matrix->num_rows,rows,matrix->i[rows],nnz);
+  //hypre_CSRMatrixDataH2DAsyncPartial(matrix,nnz,s);
+  //hypre_CSRMatrixIH2DAsyncPartial(matrix,rows,s);
+  /* Update nrows+1 with the correct NNZ value */
+  //gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix)+rows, &nnz_send,
+  //			    (size_t)(sizeof(HYPRE_Int)), 
+  //			    cudaMemcpyHostToDevice,s));
+
+  //hypre_CSRMatrixJH2DAsyncPartial(matrix,nnz, s);
   
+ }
+void hypreCSRMatrixH2DFastUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s){
+
+  
+  size_t rows=(size_t)(matrix->num_rows*frac);
+  size_t nnz=matrix->i[(int)(matrix->num_rows*frac)];
+  //nnz=hypre_CSRMatrixNumNonzeros(matrix);
+  HYPRE_Int nnz_send=nnz;
+
+  //printf("H2DAysncPartial rows %d (%d) NNZ %d (%d)\n",matrix->num_rows,rows,matrix->i[rows],nnz);
+  //hypre_CSRMatrixDataH2DAsyncPartial(matrix,nnz,s);
+  //hypre_CSRMatrixIH2DAsyncPartial(matrix,rows,s);
+  /* Update nrows+1 with the correct NNZ value */
+  // COrrect the last one
+  if (matrix->dev->last_fraction>=0.0){
+    size_t last_rows=(size_t)(matrix->num_rows*matrix->dev->last_fraction);
+    //size_t last_nnz=matrix->i[(int)(matrix->num_rows*matrix->dev->last_fraction)];
+    //HYPRE_Int last_nnz_send=last_nnz;
+    gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix)+last_rows, hypre_CSRMatrixI(matrix)+last_rows,
+			      (size_t)(sizeof(HYPRE_Int)), 
+			      cudaMemcpyHostToDevice,s));
+  }
+  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix)+rows, &nnz_send,
+			    (size_t)(sizeof(HYPRE_Int)), 
+			    cudaMemcpyHostToDevice,s));
+  matrix->dev->last_fraction=frac;
+  
+  //hypre_CSRMatrixJH2DAsyncPartial(matrix,nnz, s);
+  
+ }
 void hypre_CSRMatrixDataH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s){
   PUSH_RANGE("MatDataSendAsync",0);
   gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixDataDevice(matrix),hypre_CSRMatrixData(matrix), 
@@ -846,7 +896,7 @@ void hypre_CSRMatrixJH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size, cudaSt
 
 // dtor for the data allocated o the device
 void cuda_MatrixDestroy(hypre_CSRMatrix *matrix){
-  if (hypre_CSRMatrixDevice(matrix)){
+  if (hypre_CSRMatrixDevice(matrix)->mapped){
     //printf("Destorying CSR matrix on ccuda %d \n",hypre_CSRMatrixNumNonzeros(matrix));
     gpuErrchk(cudaFree(hypre_CSRMatrixDataDevice(matrix)));
     gpuErrchk(cudaFree(hypre_CSRMatrixIDevice(matrix)));
@@ -856,6 +906,21 @@ void cuda_MatrixDestroy(hypre_CSRMatrix *matrix){
     gpuErrchk(cusparseDestroy(hypre_CSRMatrixHandle(matrix)));
     hypre_TFree(hypre_CSRMatrixDevice(matrix));
     hypre_CSRMatrixDevice(matrix)=NULL;
+  }
+}
+void hypre_CSRMatrixDevInit(hypre_CSRMatrix *A){
+  if (hypre_CSRMatrixDevice(A)==NULL) {
+    hypre_CSRMatrixDevice(A)=hypre_CTAlloc(cuda_CSRMatrix, 1);
+    hypre_CSRMatrixDataDevice(A)=NULL;
+    hypre_CSRMatrixIDevice(A)=NULL;
+    hypre_CSRMatrixJDevice(A)=NULL;
+    hypre_CSRMatrixCopiedToDevice(A)=0;
+    gpuErrchk(cudaEventCreate(&(A->dev->start_timer)));
+    gpuErrchk(cudaEventCreate(&(A->dev->stop_timer)));
+    A->dev->call_count=0;
+    A->dev->fraction=1.0;
+    A->dev->last_fraction=-1.0;
+    A->dev->mapped=0;
   }
 }
 #endif

@@ -290,11 +290,13 @@ void hypre_CSRMatrixIH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
 void hypre_CSRMatrixJH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
 
 void hypre_CSRMatrixH2DAsyncPartial(hypre_CSRMatrix *matrix,float frac,cudaStream_t s);
+void hypreCSRMatrixH2DUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s);
+void hypreCSRMatrixH2DFastUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s);
 void hypre_CSRMatrixDataH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s);
 void hypre_CSRMatrixIH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s);
 void hypre_CSRMatrixJH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s);
 void cuda_MatrixDestroy(hypre_CSRMatrix *matrix);
-
+void hypre_CSRMatrixDevInit(hypre_CSRMatrix *A);
 #endif
 
 /* csr_matvec.c */
@@ -344,7 +346,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
                                  HYPRE_Complex    beta,
                                  hypre_Vector    *b,
                                  hypre_Vector    *y,
-					HYPRE_Int        offset ,HYPRE_Real fraction    );
+					     HYPRE_Int        offset ,HYPRE_Real fraction,HYPRE_Int branch_stream    );
 HYPRE_Int
 hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
                                  hypre_CSRMatrix *A,

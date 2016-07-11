@@ -69,13 +69,14 @@ hypre_SeqVectorDestroy( hypre_Vector *vector )
    if (vector)
    {
 #ifdef HYPRE_USE_CUDA
-if (hypre_VectorDevice(vector)){
+if (hypre_VectorDevice(vector)->mapped){
   PUSH_RANGE("VecDestroy",5)
    cudaHostUnregister(hypre_VectorData(vector));
    cudaError_t ce=cudaFree(hypre_VectorDataDevice(vector));
    if (ce!=cudaSuccess){
      printf("CUDA ERROR AT %s\n",cudaGetErrorString(ce));
    }
+   gpuErrchk(cudaEventDestroy(vector->dev->event));
    hypre_TFree(hypre_VectorDevice(vector));
    POP_RANGE
    hypre_VectorDevice(vector)=NULL;
@@ -545,6 +546,8 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
   }
   if (!hypre_VectorDataDevice(vector)){
     hypre_VectorDevice(vector)->mapped=1;
+    gpuErrchk(cudaEventCreateWithFlags(&(vector->dev->event),cudaEventDisableTiming));
+    //gpuErrchk(cudaEventCreate(&(vector->dev->event)));
     gpuErrchk(cudaStreamCreate(&vector->dev->s0));
     gpuErrchk(cudaStreamCreate(&vector->dev->s1));
     size_t size=hypre_VectorSize(vector)*sizeof(HYPRE_Complex);
@@ -572,7 +575,8 @@ void hypre_VectorDevInit(hypre_Vector *vector){
     vector->dev->mapped=0; 
     vector->dev->s0=0;
     vector->dev->s1=0;
-    vector->dev->fraction=0.70; // Default 70% in favor of the device
+    vector->dev->fraction=1.0; // Default 70% in favor of the device
+    vector->dev->cycle=0;
     //printf("Vector mapped %p\n",hypre_VectorDevice(vector));
   } 
 }

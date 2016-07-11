@@ -20,7 +20,8 @@
 #ifdef HYPRE_USE_CUDA
 void VecScale(double *u, double *v, double *l1_norm, int num_rows,cudaStream_t s);
 void VecScaleGSL(double *u, double *v, double *l1_norm, int num_rows,cudaStream_t s);
-
+void PrintVecNorm(double *u, int num_rows,int tag1, int tag2, double comp,cudaStream_t s);
+void PrintVecNormHost(double *u, int num_rows,int tag1, int tag2, double comp,cudaStream_t s);
 #endif
 /*--------------------------------------------------------------------------
  * hypre_ParCSRRelax
@@ -84,16 +85,21 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	if (!first_call){
 	  first_call=1;
 	  int priority_high, priority_low;
-	  gpuErrchk(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
-	  gpuErrchk(cudaStreamCreateWithPriority(&s0, cudaStreamNonBlocking, priority_high));
-	  gpuErrchk(cudaStreamCreateWithPriority(&s1, cudaStreamNonBlocking, priority_low));
-	}
+	  // Left here as examples for creating prioritized streams
+	  //gpuErrchk(cudaDeviceGetStreamPriorityRange(&priority_low, &priority_high));
+	  //gpuErrchk(cudaStreamCreateWithPriority(&s0, cudaStreamNonBlocking, priority_high));
+	  //gpuErrchk(cudaStreamCreateWithPriority(&s1, cudaStreamNonBlocking, priority_low));
+	  
+	  gpuErrchk(cudaStreamCreate(&s0));
+	  gpuErrchk(cudaStreamCreate(&s1));
+	} else first_call++;
 	PUSH_RANGE("L1-SJacobi",0);
 
-	 // Get a copy of l1_norms ready on the device */
+	/* Get a copy of l1_norms ready on the device */
+	/* Now used to allocate space on the device to be calculated on the device */
 	 int send_l1_norm=0;
 	 hypre_CSRMatrix   *diag   = hypre_ParCSRMatrixDiag(A);
-	 if (diag->dev){ // The matrix has been shadowed on the device
+	 if (diag->dev->mapped){ // The matrix has been shadowed on the device
 	   if (!hypre_CSRMatrixCopiedToDevice(diag)) send_l1_norm=1; // But has not been copied for some reason
 	   if (diag->dev->l1_norms_device)
 	     l1_norms_device=diag->dev->l1_norms_device;
@@ -103,7 +109,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 
 	 int registered=0;
 	 if (send_l1_norm){
-	   int send_size=num_rows*hypre_ParVectorLocalVector(v)->dev->fraction; 
+	   int send_size=num_rows; // Used to be *diag->dev->fraction; 
 	     
 	   PUSH_RANGE("NORM_COPY",1);
 	   gpuErrchk(cudaMalloc((void**)&l1_norms_device,send_size*sizeof(HYPRE_Real)));
@@ -119,48 +125,53 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	 hypre_ParVectorLocalVector(v)->dev->nosync=1;
 	 hypre_ParVectorLocalVector(v)->dev->s0=s0;
 	 hypre_ParVectorLocalVector(v)->dev->s1=s1;
+	 hypre_ParVectorLocalVector(v)->dev->ref_count=0;
+	 hypre_ParVectorLocalVector(v)->dev->cycle++;
+	 int ccc=hypre_ParVectorLocalVector(v)->dev->cycle;
 #endif
 
-
-         hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
+         hypre_ParCSRMatrixMatvecDevice(-relax_weight, A, u, relax_weight, v);
 
 #ifdef HYPRE_USE_CUDA	 
 	 offset1=hypre_ParVectorLocalVector(v)->dev->offset1;
 	 offset2=hypre_ParVectorLocalVector(v)->dev->offset2;
 
 	 hypre_ParVectorLocalVector(v)->dev->nosync=0;
-	 //cudaDeviceSynchronize();
+	 
 	 if (hypre_ParVectorLocalVector(v)->dev->ref_count==2){
+
 	   HYPRE_Real *u_device=hypre_ParVectorLocalVector(u)->dev->data;
 	   HYPRE_Real *v_device=hypre_ParVectorLocalVector(v)->dev->data;
 	   PUSH_RANGE("VEC_SCALE_CUDA",2);
 	   hypre_CSRMatrix   *diag   = hypre_ParCSRMatrixDiag(A);
 	   hypre_CSRMatrix   *offd   = hypre_ParCSRMatrixOffd(A);
-	   if (send_l1_norm)
+	   if (send_l1_norm){
 	     VecScaleWithNorms(u_device+offset1,v_device+offset1,l1_norms_device+offset1,
 			       diag->dev->i+offset1,diag->dev->data+offset1,offd->dev->i+offset1,offd->dev->data+offset1,
-		   offset2-offset1,s1);
-	   else
+			       offset2-offset1,s1);
+	   } else{
+
 	     VecScale(u_device+offset1,v_device+offset1,l1_norms_device+offset1,offset2-offset1,s1);
+	   }
 	   
-	   //cudaDeviceSynchronize();
 	   hypre_VectorD2HAsyncPartial(hypre_ParVectorLocalVector(u),(size_t)(offset2-offset1),s1);
-	   //cudaDeviceSynchronize();
+	   
 	   POP_RANGE
+	   gpuErrchk(cudaEventSynchronize(hypre_ParVectorLocalVector(v)->dev->event)); /* Avoid data race */
 	   PUSH_RANGE("VEC_SCALE_HOST",3);
 	   for (i = offset2; i < num_rows; i++)
 	     u_data[i] += v_data[i] / l1_norms[i];
 
 	   POP_RANGE
-	     //cudaDeviceSynchronize();
 	   cudaStreamSynchronize(s1);
+	   cudaStreamSynchronize(s0);
 	   
 	 } else {
 	   for (i = 0; i < num_rows; i++)
 	     u_data[i] += v_data[i] / l1_norms[i];
 	 }
 
-	 if (l1_norms_device && diag->dev) diag->dev->l1_norms_device=l1_norms_device;
+	 if (l1_norms_device && diag->dev->mapped) diag->dev->l1_norms_device=l1_norms_device;
 	 POP_RANGE
 	 hypre_ParVectorLocalVector(u)->dev->offset1=-1;
 	 hypre_ParVectorLocalVector(u)->dev->offset2=-1;

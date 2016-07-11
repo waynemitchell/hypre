@@ -1,4 +1,22 @@
 #include <stdio.h>
+__device__ double norm_agg;
+__device__ double atomicAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull =
+                              (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val +
+                               __longlong_as_double(assumed)));
+
+    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+    } while (assumed != old);
+
+    return __longlong_as_double(old);
+}
 
 #define gpuErrchk2(ans) { gpuAssert2((ans), __FILE__, __LINE__); }
 inline void gpuAssert2(cudaError_t code, const char *file, int line)
@@ -6,6 +24,7 @@ inline void gpuAssert2(cudaError_t code, const char *file, int line)
    if (code != cudaSuccess) 
    {
      printf("GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+     exit(2);
    }
 }
 
@@ -30,6 +49,26 @@ __global__
 void PrintDeviceArrayKernel(double *a,int num_rows){
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i<num_rows) printf("PrintARRAYDEVICE %d %lf\n",i,a[i]);
+}
+
+__global__
+void PrintVecNormKernel(double *a,int tag1, int tag2, double comp,int num_rows){
+  int ii = blockIdx.x * blockDim.x + threadIdx.x;
+  __shared__ double ssum[32];
+  ssum[ii]=0.0;
+  int i;
+  for (i = blockIdx.x * blockDim.x + threadIdx.x; 
+       i < num_rows; 	 
+       i += blockDim.x * gridDim.x) {
+    ssum[threadIdx.x]+=a[i];
+  }
+  __syncthreads();
+  if (ii==0) {
+    double norm=0.0;
+    int j;
+    for(j=0;j<32;j++) norm+=ssum[j];
+    printf("VECNORM %d IS %lf == %lf %d\n",tag1*1000+tag2,norm,comp,num_rows);
+  }
 }
   
 extern "C"{
@@ -72,6 +111,20 @@ extern "C"{
     //gpuErrchk2(cudaPeekAtLastError());
     //gpuErrchk2(cudaDeviceSynchronize());
     PrintDeviceArrayKernel<<<num_blocks,32,0,s>>>(u,num_rows);
+  }
+}
+
+extern "C"{
+  void PrintVecNorm(double *u, int num_rows,int tag1, int tag2, double comp,cudaStream_t s)
+  {
+    //int num_blocks=num_rows/32+1;
+    //printf("Vecscale in Kernale call %d %d = %d %d\n",num_blocks,num_rows,num_blocks*32,sizeof(int));
+    //printf("ARGs %p %d %d\n",u,tag1,tag2);
+    //gpuErrchk2(cudaPeekAtLastError());
+    //gpuErrchk2(cudaDeviceSynchronize());
+    PrintVecNormKernel<<<1,32,0,s>>>(u,tag1,tag2, comp,num_rows);
+    //gpuErrchk2(cudaPeekAtLastError());
+    //gpuErrchk2(cudaDeviceSynchronize());
   }
 }
 
@@ -144,5 +197,12 @@ extern "C"{
     //dummy<<<num_blocks,32,0,s>>>(u,v,l1_norm,num_rows);
     //gpuErrchk2(cudaPeekAtLastError());
     //gpuErrchk2(cudaDeviceSynchronize());
+  }
+}
+extern "C"{
+  void PrintVecNormHost(double *u, int num_rows,int tag1, int tag2, double comp,cudaStream_t s){
+    double norm=0.0;
+    for(int i=0;i<num_rows;i++) norm+=u[i];
+    printf("VECNORM %d IS %lf == %lf \n",tag1*1000+tag2,norm,comp);
   }
 }

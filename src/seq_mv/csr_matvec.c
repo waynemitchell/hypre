@@ -19,7 +19,12 @@
 #include "seq_mv.h"
 #include <assert.h>
 #include <stdio.h>
-
+#ifdef HYPRE_USE_CUDA
+#include <time.h>
+struct timespec timer_start();
+float timer_end(struct timespec start_time);
+void PrintVecNorm(double *u, int num_rows,int tag1, int tag2, double comp,cudaStream_t s);
+#endif
 
 /*--------------------------------------------------------------------------
  * hypre_CSRMatrixMatvec
@@ -39,13 +44,9 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 #ifdef HYPRE_USE_CUDA
 
 
-#define CUDA_MATVEC_CUTOFF 5000000						
   if (hypre_CSRMatrixNumNonzeros(A)>CUDA_MATVEC_CUTOFF)
-    return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset,y->dev->fraction);
-  //printf("Matrix Vector OOP %d   %d \n",hypre_CSRMatrixNumNonzeros(A),hypre_VectorSize(y));
-  //if (hypre_VectorSize(y)>CUDA_MATVEC_CUTOFF)
-  // return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset);
-  //printf("MATVEC_OOP on Host vec size %d\n",hypre_VectorSize(y));
+    return hypre_CSRMatrixMatvecOutOfPlaceHybrid2(alpha,A,x,beta,b,y,offset,A->dev->fraction);
+
 #endif
 
 
@@ -803,7 +804,7 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
   PUSH_RANGE("Matvec DEVICE",4);
   //printf("Entre hypre_CSRMatrixMatvec CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
   //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
-  if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
+  if (!(hypre_CSRMatrixDevice(A)->mapped))hypre_CSRMatrixMapToDevice(A);
   if (!hypre_VectorDevice(x)->mapped) hypre_VectorMapToDevice(x);
   if (!hypre_VectorDevice(y)->mapped) hypre_VectorMapToDevice(y);
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
@@ -940,7 +941,7 @@ hypre_CSRMatrixMatvecOutOfPlaceDevice( HYPRE_Complex    alpha,
 
    //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
    //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
-   if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
+   if (!(hypre_CSRMatrixDevice(A)->mapped))hypre_CSRMatrixMapToDevice(A);
    if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
    if (!hypre_VectorDevice(b)) hypre_VectorMapToDevice(b);
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
@@ -1077,7 +1078,7 @@ hypre_CSRMatrixMatvecOutOfPlaceDeviceAsync( HYPRE_Complex    alpha,
 
    //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
    //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
-   if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
+   if (!(hypre_CSRMatrixDevice(A)->mapped))hypre_CSRMatrixMapToDevice(A);
    if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
    if (!hypre_VectorDevice(b)) hypre_VectorMapToDevice(b);
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
@@ -1156,7 +1157,8 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid( HYPRE_Complex    alpha,
   */
   PUSH_RANGE("MV-Hybrid",4);
   HYPRE_Int  offset,offset2; // Total and 2nd offset for the hybrid operation
-
+  fprintf(stderr,"ERROR THIS DHOULD  NOT BE GETTING CALLED\n");
+  exit(2);
   offset2=hypre_VectorSize(x)*0.43; // needs to take offset1 into account. PBUGS
   offset=offset2;
 
@@ -1234,7 +1236,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid( HYPRE_Complex    alpha,
 
    //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d %d\n",A->num_rows,A->num_nonzeros,A->i[A->num_rows]);
    //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
-   if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
+   if (!(hypre_CSRMatrixDevice(A)->mapped))hypre_CSRMatrixMapToDevice(A);
    if (!hypre_VectorDevice(x)) hypre_VectorMapToDevice(x);
    if (!hypre_VectorDevice(b)) hypre_VectorMapToDevice(b);
   // printf("IN CUDAFIED hypre_CSRMatrixMatvec\n");
@@ -1404,7 +1406,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
                                  HYPRE_Complex    beta,
                                  hypre_Vector    *b,
                                  hypre_Vector    *y,
-				 HYPRE_Int        offset1,HYPRE_Real fraction     )
+					     HYPRE_Int        offset1,HYPRE_Real fraction,HYPRE_Int branch_stream     )
 {
   /* This version computes the bottom section of the product on the host and 
      sends the top half to the device.
@@ -1413,15 +1415,17 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
   HYPRE_Int  offset,offset2; // Total and 2nd offset for the hybrid operation
   //float fraction=1.0;
   offset2=hypre_VectorSize(b)*fraction; // needs to take offset1 into account. PBUGS
-  offset=offset2;
+  offset=offset1;
+  int ccc=0;
+  ccc=y->dev->cycle;
 
   PUSH_RANGE_PAYLOAD("MV-HYB-2P",4,offset2)
   y->dev->ref_count++;
   //printf("Call to Hybrid:: ref_count = %d\n",y->ref_count);
-   HYPRE_Complex    *A_data   = hypre_CSRMatrixData(A);
-   HYPRE_Int        *A_i      = hypre_CSRMatrixI(A) + offset;
-   HYPRE_Int        *A_j      = hypre_CSRMatrixJ(A);
-   HYPRE_Int         num_rows = hypre_CSRMatrixNumRows(A) - offset;
+  //HYPRE_Complex    *A_data   = hypre_CSRMatrixData(A);
+  //HYPRE_Int        *A_i      = hypre_CSRMatrixI(A) + offset;
+  //HYPRE_Int        *A_j      = hypre_CSRMatrixJ(A);
+  HYPRE_Int         num_rows = hypre_CSRMatrixNumRows(A) - offset;
    HYPRE_Int         num_cols = hypre_CSRMatrixNumCols(A);
    /*HYPRE_Int         num_nnz  = hypre_CSRMatrixNumNonzeros(A);*/
 
@@ -1456,7 +1460,7 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
    cudaStream_t s0,s1;
    s0=y->dev->s0;
    s1=y->dev->s1;
-
+   
 
    /*---------------------------------------------------------------------
     *  Check for size compatibility.  Matvec returns ierr = 1 if
@@ -1481,12 +1485,30 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
    if (num_cols != x_size && (num_rows != y_size || num_rows != b_size))
       ierr = 3;
 
-   //printf("Entre hypre_CSRMatrixMatvecOutofPlace CUDA Version %d %d oFFSET %d\n",A->num_rows,A->num_nonzeros,offset2);
-   //printf("Size of data varbls is %d Alpha = %lf, beta = %lf \n",sizeof(HYPRE_Complex),alpha,beta);
-   if (!(hypre_CSRMatrixDevice(A)))hypre_CSRMatrixMapToDevice(A);
- 
+   if (!(hypre_CSRMatrixDevice(A)->mapped))hypre_CSRMatrixMapToDevice(A);
+   A->dev->call_count++;
+   int balance_start=2;
+   if (A->dev->call_count==(balance_start+2)){
+     float milliseconds = 0;
+     gpuErrchk(cudaEventSynchronize(A->dev->stop_timer));
+     cudaEventElapsedTime(&milliseconds, A->dev->start_timer, A->dev->stop_timer);
+     float projected=(A->dev->host_time/(1.0-fraction))/((milliseconds/fraction)+A->dev->host_time/(1.0-fraction));
+     if ((projected<0.0)||(projected>1.0)){
+       fprintf(stderr,"ERROR:: MESSED UP PROJECTIONS %f\n",projected);
+       exit(2);
+     }
+
+     //     printf("Device runtime for Array %p is %f Host = %f Fraction = %f, Proj= %f Change=%f\n",A->dev,milliseconds/fraction,A->dev->host_time/(1.0-fraction),fraction, projected,(projected-fraction)/fraction*100.0);
+     A->dev->fraction=projected;
+   } else if (A->dev->call_count==balance_start){
+     A->dev->fraction=0.7;
+   }
+   
+   struct timespec start=timer_start();
+   gpuErrchk(cudaEventRecord(A->dev->start_timer,s0));
    if (!hypre_CSRMatrixCopiedToDevice(A)){
      hypre_CSRMatrixH2DAsyncPartial(A,fraction,s0);
+     //hypre_CSRMatrixH2DAsync(A,s0);
      hypre_CSRMatrixCopiedToDevice(A)=1;
 #ifdef HYPRE_USE_CUDA_HYB
     //printf("Preparing to convert to hyb format\n");
@@ -1510,25 +1532,30 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
 #endif
     // WARNING:: assumes that A is static and doesnot change 
   }
+   
    if (!hypre_VectorDevice(x)->mapped) hypre_VectorMapToDevice(x);
    hypre_VectorH2DAsync(x,s0);
+
    if (!hypre_VectorDevice(b)->mapped) hypre_VectorMapToDevice(b);
+   if (!hypre_VectorDevice(y)->mapped) hypre_VectorMapToDevice(y);
    if (b->dev->send_to_device){
      hypre_VectorH2DCrossAsync(y,b,offset1,offset2-offset1,s0); 
    } 
 
-   if (!hypre_VectorDevice(y)->mapped) hypre_VectorMapToDevice(y);
+ 
    b->dev->offset1=offset1;
    b->dev->offset2=offset2;
    y->dev->offset1=offset1;
    y->dev->offset2=offset2;
    x->dev->offset1=offset1;
    x->dev->offset2=offset2;
+   
   cusparseStatus_t status;
 #ifndef HYPRE_USE_CUDA_HYB
   status=cusparseSetStream(hypre_CSRMatrixHandle(A) ,s0);
   if (status != CUSPARSE_STATUS_SUCCESS) {
     printf("ERROR:: cusparseSetStream Failed\n");
+    exit(2);
   } 
   status= cusparseDcsrmv(hypre_CSRMatrixHandle(A) ,
 			 CUSPARSE_OPERATION_NON_TRANSPOSE, 
@@ -1557,19 +1584,19 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
 
     // Insert event in stream s0 and make s1 wait on it. This is to make sure that
     // the data for Vecscale has been computed.
-    //cudaEvent_t event;
-    gpuErrchk(cudaEventCreateWithFlags(&(y->dev->event),cudaEventDisableTiming));
-    gpuErrchk(cudaEventRecord(y->dev->event,s0));
-    gpuErrchk(cudaStreamWaitEvent(s1,y->dev->event,0));
-   // End code for syncing Matvec & Vecscale
+ 
+    if (branch_stream){
+      gpuErrchk(cudaEventRecord(y->dev->event,s0));
+      gpuErrchk(cudaStreamWaitEvent(s1,y->dev->event,0));
+    }
     
     if (y->dev->bring_from_device) hypre_VectorD2HCrossAsync(y,y,offset1,offset2-offset1,s0);
-
-
+    gpuErrchk(cudaEventRecord(A->dev->stop_timer,s0));
+    
   // Call the host code
   hypre_CSRMatrixMatvecStrip( alpha,A,x,beta,b,y,offset2,A->num_rows);
-			    
-
+  
+  A->dev->host_time=timer_end(start);
   POP_RANGE
   return ierr;
 }
@@ -1582,8 +1609,23 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2( HYPRE_Complex    alpha,
                                  hypre_Vector    *y,
 					HYPRE_Int        offset1,HYPRE_Real fraction     )
 {
-  HYPRE_Int retval=hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( alpha,A,x,beta,b,y,offset1,fraction);
+  HYPRE_Int retval=hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( alpha,A,x,beta,b,y,offset1,fraction,0);
   gpuErrchk(cudaDeviceSynchronize());
   return retval;
+}
+
+struct timespec timer_start(){
+    struct timespec start_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    return start_time;
+}
+
+// call this function to end a timer, returning milliseconds elapsed as a float
+float timer_end(struct timespec start_time){
+    struct timespec end_time;
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    long long diffInNanos = end_time.tv_nsec - start_time.tv_nsec;
+    float millisecs=(end_time.tv_sec-start_time.tv_sec)*1000.0+diffInNanos/1000000.0;
+    return millisecs;
 }
 #endif

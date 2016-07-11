@@ -1,4 +1,8 @@
+#ifndef __CUDA_CSRMATRIX__
+#define __CUDA_CSRMATRIX__
+#define CUDA_MATVEC_CUTOFF 5000000
 typedef struct cuda_CSRMatrix{
+  HYPRE_Int mapped;
   HYPRE_Int     *i;
   HYPRE_Int     *j;
   
@@ -8,6 +12,12 @@ typedef struct cuda_CSRMatrix{
   cusparseMatDescr_t descr;
   HYPRE_Int copied;
   HYPRE_Real *l1_norms_device;
+  cudaEvent_t start_timer;
+  cudaEvent_t stop_timer;
+  HYPRE_Real host_time;
+  HYPRE_Real fraction;
+  HYPRE_Real last_fraction;
+  int call_count;
 } cuda_CSRMatrix;
 
 typedef struct cuda_Vector{
@@ -23,4 +33,6 @@ typedef struct cuda_Vector{
   HYPRE_Int ref_count;
   HYPRE_Int bring_from_device;
   HYPRE_Int nosync;
+  HYPRE_Int cycle;
 } cuda_Vector;
+#endif
