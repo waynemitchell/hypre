@@ -807,24 +807,24 @@ void hypre_CSRMatrixJH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s){
 }
 // The Asynchrononous Partial versions 
 
-void hypre_CSRMatrixH2DAsyncPartial(hypre_CSRMatrix *matrix,float frac, cudaStream_t s){
+void hypre_CSRMatrixH2DAsyncPartial(hypre_CSRMatrix *matrix,HYPRE_Real frac, cudaStream_t s){
  
   size_t rows=(size_t)(matrix->num_rows*frac);
   size_t nnz=matrix->i[(int)(matrix->num_rows*frac)];
   //nnz=hypre_CSRMatrixNumNonzeros(matrix);
   HYPRE_Int nnz_send=nnz;
-  //printf("H2DAysncPartial rows %d (%d) NNZ %d (%d)\n",matrix->num_rows,rows,matrix->i[rows],nnz);
+  //printf("H2DAysncPartial rows %d (%d) NNZ %d (%d) Frac=%f\n",matrix->num_rows,rows,matrix->i[rows],nnz,frac);
   hypre_CSRMatrixDataH2DAsyncPartial(matrix,nnz,s);
-  hypre_CSRMatrixIH2DAsyncPartial(matrix,rows,s);
+  hypre_CSRMatrixIH2DAsyncPartial(matrix,rows+1,s);
   /* Update nrows+1 with the correct NNZ value */
-  gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix)+rows, &nnz_send,
-			    (size_t)(sizeof(HYPRE_Int)), 
-			    cudaMemcpyHostToDevice,s));
+  //gpuErrchk(cudaMemcpyAsync(hypre_CSRMatrixIDevice(matrix)+rows, &nnz_send,
+  //			    (size_t)(sizeof(HYPRE_Int)), 
+  //			    cudaMemcpyHostToDevice,s));
   hypre_CSRMatrixJH2DAsyncPartial(matrix,nnz, s);
   
  }
 
-void hypreCSRMatrixH2DUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s){
+void hypreCSRMatrixH2DUpdate(hypre_CSRMatrix *matrix,HYPRE_Real frac, cudaStream_t s){
   size_t rows=(size_t)(matrix->num_rows*frac);
   size_t nnz=matrix->i[(int)(matrix->num_rows*frac)];
   //nnz=hypre_CSRMatrixNumNonzeros(matrix);
@@ -840,7 +840,7 @@ void hypreCSRMatrixH2DUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s)
   //hypre_CSRMatrixJH2DAsyncPartial(matrix,nnz, s);
   
  }
-void hypreCSRMatrixH2DFastUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s){
+void hypreCSRMatrixH2DFastUpdate(hypre_CSRMatrix *matrix,HYPRE_Real frac, cudaStream_t s){
 
   
   size_t rows=(size_t)(matrix->num_rows*frac);

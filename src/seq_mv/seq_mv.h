@@ -289,9 +289,9 @@ void hypre_CSRMatrixDataH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
 void hypre_CSRMatrixIH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
 void hypre_CSRMatrixJH2DAsync(hypre_CSRMatrix *matrix,cudaStream_t s);
 
-void hypre_CSRMatrixH2DAsyncPartial(hypre_CSRMatrix *matrix,float frac,cudaStream_t s);
-void hypreCSRMatrixH2DUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s);
-void hypreCSRMatrixH2DFastUpdate(hypre_CSRMatrix *matrix,float frac, cudaStream_t s);
+void hypre_CSRMatrixH2DAsyncPartial(hypre_CSRMatrix *matrix,HYPRE_Real frac,cudaStream_t s);
+void hypreCSRMatrixH2DUpdate(hypre_CSRMatrix *matrix,HYPRE_Real frac, cudaStream_t s);
+void hypreCSRMatrixH2DFastUpdate(hypre_CSRMatrix *matrix,HYPRE_Real frac, cudaStream_t s);
 void hypre_CSRMatrixDataH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s);
 void hypre_CSRMatrixIH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s);
 void hypre_CSRMatrixJH2DAsyncPartial(hypre_CSRMatrix *matrix,size_t size,cudaStream_t s);
