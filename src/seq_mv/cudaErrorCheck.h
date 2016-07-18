@@ -56,4 +56,6 @@ extern inline void cusparseAssert(cusparseStatus_t code, const char *file, int l
    }
 }
 int PointerType(const void *ptr);
+
+
 #endif

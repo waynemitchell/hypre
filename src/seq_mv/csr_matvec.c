@@ -24,6 +24,7 @@
 struct timespec timer_start();
 float timer_end(struct timespec start_time);
 void PrintVecNorm(double *u, int num_rows,int tag1, int tag2, double comp,cudaStream_t s);
+void CudaCompileFlagCheck();
 #endif
 
 /*--------------------------------------------------------------------------
@@ -1461,6 +1462,11 @@ hypre_CSRMatrixMatvecOutOfPlaceHybrid2Async( HYPRE_Complex    alpha,
    s0=y->dev->s0;
    s1=y->dev->s1;
    
+   static int firstcall=0;
+   if (!firstcall){
+     firstcall=1;
+     CudaCompileFlagCheck();
+   }
 
    /*---------------------------------------------------------------------
     *  Check for size compatibility.  Matvec returns ierr = 1 if

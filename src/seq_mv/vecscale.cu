@@ -206,3 +206,46 @@ extern "C"{
     printf("VECNORM %d IS %lf == %lf \n",tag1*1000+tag2,norm,comp);
   }
 }
+extern "C"{
+__global__
+void CompileFlagSafetyCheck(int actual){
+#ifdef __CUDA_ARCH__
+  int cudarch=__CUDA_ARCH__;
+  if (cudarch!=actual){
+    printf("WARNING :: nvcc -arch flag does not match actual device architecture\nWARNING :: The code can fail silently and produce wrong results\n");
+    printf("Arch specified at compile = sm_%d Actual device = sm_%d\n",cudarch/10,actual/10);
+  } else printf("CompileFlagSafetyCheck:: Compile flag %d matches arch\n",cudarch);
+  //return __CUDA_ARCH__;
+#else
+  printf("EROR:: CUDA ARCH IS 0 \n This should not be happening\n");
+  //return 0;
+#endif
+}
+}
+extern "C"{
+  void CudaCompileFlagCheck(){
+    int devCount;
+    cudaGetDeviceCount(&devCount);
+    printf("CudaCompileFlagCheck:: Device Count:: %d \n",devCount);
+    int i;
+    int cudarch_actual;
+    for(i = 0; i < devCount; ++i)
+      {
+	struct cudaDeviceProp props;
+	cudaGetDeviceProperties(&props, i);
+	printf("CudaCompileFlagCheck::Name %s major = %d minor = %d \n",props.name,props.major,props.minor);
+	cudarch_actual=props.major*100+props.minor*10;
+    }
+    gpuErrchk2(cudaPeekAtLastError());
+    gpuErrchk2(cudaDeviceSynchronize());
+    CompileFlagSafetyCheck<<<1,1,0,0>>>(cudarch_actual);
+    cudaError_t code=cudaPeekAtLastError();
+    if (code != cudaSuccess)
+      {
+	printf("ERROR in CudaCompileFlagCheck%s \n", cudaGetErrorString(code));
+	printf("ERROR :: Check if compile arch flags match actual device arch = sm_%d\n",cudarch_actual/10);
+	exit(2);
+      }
+    gpuErrchk2(cudaDeviceSynchronize());
+  }
+}
