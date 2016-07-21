@@ -49,8 +49,8 @@ hypre_CSRMatrixAdd( hypre_CSRMatrix *A,
    HYPRE_Int        *C_j;
 
    HYPRE_Int         ia, ib, ic, jcol, num_nonzeros;
-   HYPRE_Int         pos;
-   HYPRE_Int         *marker;
+   HYPRE_Int         max_num_threads;
+   HYPRE_Int         *jj_count;
 
    if (nrows_A != nrows_B || ncols_A != ncols_B)
    {
@@ -59,16 +59,45 @@ hypre_CSRMatrixAdd( hypre_CSRMatrix *A,
    }
 
 
-   marker = hypre_CTAlloc(HYPRE_Int, ncols_A);
    C_i = hypre_CTAlloc(HYPRE_Int, nrows_A+1);
 
-   for (ia = 0; ia < ncols_A; ia++)
+   max_num_threads = hypre_NumThreads();
+
+   jj_count = hypre_CTAlloc(HYPRE_Int, max_num_threads);
+
+#ifdef HYPRE_USING_OPENMP
+#pragma omp parallel private(ia, ib, ic, jcol, num_nonzeros)
+_entry, b_entry)
+#endif
+   {
+    HYPRE_Int         *marker = NULL;
+    HYPRE_Int ns, ne, i1, ii, jj;
+    HYPRE_Int size, rest, num_threads;
+    HYPRE_Int         pos;
+    ii = hypre_GetThreadNum();
+    num_threads = hypre_NumActiveThreads();
+
+    size = nrows_A/num_threads;
+    rest = nrows_A - size*num_threads;
+    if (ii < rest)
+    {
+       ns = ii*size+ii;
+       ne = (ii+1)*size+ii+1;
+    }
+    else
+    {
+       ns = ii*size+rest;
+       ne = (ii+1)*size+rest;
+    }
+
+    marker = hypre_CTAlloc(HYPRE_Int, ncols_A);
+    for (ia = 0; ia < ncols_A; ia++)
       marker[ia] = -1;
 
-   num_nonzeros = 0;
-   C_i[0] = 0;
-   for (ic = 0; ic < nrows_A; ic++)
-   {
+    num_nonzeros = 0;
+    for (ic = ns; ic < ne; ic++)
+    {
+      C_i[ic] = num_nonzeros;
       for (ia = A_i[ic]; ia < A_i[ic+1]; ia++)
       {
          jcol = A_j[ia];
@@ -84,21 +113,44 @@ hypre_CSRMatrixAdd( hypre_CSRMatrix *A,
             num_nonzeros++;
          }
       }
-      C_i[ic+1] = num_nonzeros;
-   }
+    }
+    jj_count[ii] = num_nonzeros;
+#ifdef HYPRE_USING_OPENMP
+#pragma omp barrier
+#endif
 
-   C = hypre_CSRMatrixCreate(nrows_A, ncols_A, num_nonzeros);
-   hypre_CSRMatrixI(C) = C_i;
-   hypre_CSRMatrixInitialize(C);
-   C_j = hypre_CSRMatrixJ(C);
-   C_data = hypre_CSRMatrixData(C);
+    if (ii)
+    {
+       jj = jj_count[0];
+       for (i1 = 1; i1 < ii; i1++)
+          jj += jj_count[i1];
 
-   for (ia = 0; ia < ncols_A; ia++)
+       for (i1 = ns; i1 < ne; i1++)
+          C_i[i1] += jj;
+    }
+    else
+    {
+       C_i[nrows_A] = 0;
+       for (i1 = 0; i1 < num_threads; i1++)
+          C_i[nrows_A] += jj_count[i1];
+
+       C = hypre_CSRMatrixCreate(nrows_A, ncols_A, C_i[nrows_A]);
+       hypre_CSRMatrixI(C) = C_i;
+       hypre_CSRMatrixInitialize(C);
+       C_j = hypre_CSRMatrixJ(C);
+       C_data = hypre_CSRMatrixData(C);
+    }
+
+#ifdef HYPRE_USING_OPENMP
+#pragma omp barrier
+#endif
+
+    for (ia = 0; ia < ncols_A; ia++)
       marker[ia] = -1;
 
-   pos = 0;
-   for (ic = 0; ic < nrows_A; ic++)
-   {
+    pos = C_i[ns];
+    for (ic = ns; ic < ne; ic++)
+    {
       for (ia = A_i[ic]; ia < A_i[ic+1]; ia++)
       {
          jcol = A_j[ia];
@@ -122,9 +174,12 @@ hypre_CSRMatrixAdd( hypre_CSRMatrix *A,
             C_data[marker[jcol]] += B_data[ib];
          }
       }
-   }
+    }
 
-   hypre_TFree(marker);
+    hypre_TFree(marker);
+   } /*end parallel region */
+   hypre_TFree(jj_count);
+
    return C;
 }       
 
