@@ -67,7 +67,6 @@ hypre_CSRMatrixAdd( hypre_CSRMatrix *A,
 
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel private(ia, ib, ic, jcol, num_nonzeros)
-_entry, b_entry)
 #endif
    {
     HYPRE_Int         *marker = NULL;
