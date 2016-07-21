@@ -83,6 +83,7 @@ FILES =\
  par_amg_setup.c\
  par_amg_solve.c\
  par_amg_solveT.c\
+ par_amg_mod_setup.c\
  par_cg_relax_wt.c\
  par_coarsen.c\
  par_cgc_coarsen.c\

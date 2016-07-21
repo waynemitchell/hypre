@@ -104,6 +104,21 @@ HYPRE_Int HYPRE_BoomerAMGSetup(HYPRE_Solver       solver,
                                HYPRE_ParVector    b,
                                HYPRE_ParVector    x);
 
+/*
+ * Set up the modular BoomerAMG solver or preconditioner.  
+ * If used as a preconditioner, this function should be passed
+ * to the iterative solver {\tt SetPrecond} function.
+ *
+ * @param solver [IN] object to be set up.
+ * @param A [IN] ParCSR matrix used to construct the solver/preconditioner.
+ * @param b Ignored by this function.
+ * @param x Ignored by this function.
+ **/
+HYPRE_Int HYPRE_BoomerAMGModSetup(HYPRE_Solver       solver,
+                               HYPRE_ParCSRMatrix A,
+                               HYPRE_ParVector    b,
+                               HYPRE_ParVector    x);
+
 /**
  * Solve the system or apply AMG as a preconditioner.
  * If used as a preconditioner, this function should be passed

@@ -57,6 +57,7 @@ LFLAGS =\
 
 HYPRE_DRIVERS =\
  ij.c\
+ mod_ij.c\
  new_ij.c\
  sstruct.c\
  struct.c\
@@ -128,6 +129,10 @@ distclean: clean
 # C
 
 ij: ij.o
+	@echo  "Building" $@ "... "
+	${LINK_CC} -o $@ $@.o ${CFLAGS} ${LFLAGS}
+
+mod_ij: mod_ij.o
 	@echo  "Building" $@ "... "
 	${LINK_CC} -o $@ $@.o ${CFLAGS} ${LFLAGS}
 

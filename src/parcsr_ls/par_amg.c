@@ -135,12 +135,12 @@ hypre_BoomerAMGCreate()
    agg_P12_trunc_factor = 0.0;
    jacobi_trunc_threshold = 0.01;
    S_commpkg_switch = 1.0;
-   interp_type = 0;
+   interp_type = 6;
    sep_weight = 0;
-   coarsen_type = 6;
+   coarsen_type = 10;
    measure_type = 0;
    setup_type = 1;
-   P_max_elmts = 0;
+   P_max_elmts = 4;
    agg_P_max_elmts = 0;
    agg_P12_max_elmts = 0;
    num_functions = 1;
@@ -460,10 +460,12 @@ hypre_BoomerAMGDestroy( void *data )
 	hypre_TFree(hypre_ParAMGDataCFMarkerArray(amg_data)[i-1]);
 
         /* get rid of any block structures */ 
-        if (hypre_ParAMGDataABlockArray(amg_data)[i])
+        if (hypre_ParAMGDataABlockArray(amg_data))
+	  if (hypre_ParAMGDataABlockArray(amg_data)[i])
            hypre_ParCSRBlockMatrixDestroy(hypre_ParAMGDataABlockArray(amg_data)[i]);
     
-        if (hypre_ParAMGDataPBlockArray(amg_data)[i-1])
+        if (hypre_ParAMGDataPBlockArray(amg_data))
+         if (hypre_ParAMGDataPBlockArray(amg_data)[i-1])
            hypre_ParCSRBlockMatrixDestroy(hypre_ParAMGDataPBlockArray(amg_data)[i-1]);
 
    }
