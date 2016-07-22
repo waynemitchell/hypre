@@ -165,9 +165,9 @@ main( hypre_int argc,
    HYPRE_Real   CR_rate = 0.7;
    HYPRE_Real   CR_strong_th = 0.0;
    HYPRE_Int      CR_use_CG = 0;
-   HYPRE_Int      P_max_elmts = 0;
+   HYPRE_Int      P_max_elmts = 4;
    HYPRE_Int      cycle_type;
-   HYPRE_Int      coarsen_type = 6;
+   HYPRE_Int      coarsen_type = 10;
    HYPRE_Int      measure_type = 0;
    HYPRE_Int      num_sweeps = 1;  
    HYPRE_Int      IS_type;   
@@ -241,7 +241,7 @@ main( hypre_int argc,
    /* parameters for GSMG */
    HYPRE_Int      gsmg_samples = 5;
    /* interpolation */
-   HYPRE_Int      interp_type  = 0; /* default value */
+   HYPRE_Int      interp_type  = 6; /* default value */
    HYPRE_Int      post_interp_type  = 0; /* default value */
    /* aggressive coarsening */
    HYPRE_Int      agg_interp_type  = 4; /* default value */

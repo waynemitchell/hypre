@@ -543,11 +543,6 @@ main( hypre_int argc,
    }
 
 
-   if (solver_id == 8 || solver_id == 18)
-   {
-      max_levels = 1;
-   }
-
    /* defaults for BoomerAMG */
    if (solver_id == 0 || solver_id == 1 || solver_id == 3 || solver_id == 5
        || solver_id == 9 || solver_id == 13 || solver_id == 14
