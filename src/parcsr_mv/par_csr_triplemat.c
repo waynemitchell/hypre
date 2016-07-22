@@ -174,8 +174,10 @@ hypre_ParCSRMatrix *hypre_ParCSRMatMat( hypre_ParCSRMatrix  *A,
    hypre_ParCSRMatrixSetRowStartsOwner(C,0);
    hypre_ParCSRMatrixSetColStartsOwner(C,0);
 
+   hypre_CSRMatrixDestroy(hypre_ParCSRMatrixDiag(C));
    hypre_ParCSRMatrixDiag(C) = C_diag;
 
+   hypre_CSRMatrixDestroy(hypre_ParCSRMatrixOffd(C));
    hypre_ParCSRMatrixOffd(C) = C_offd;
 
    if (num_cols_offd_C)
@@ -479,6 +481,7 @@ hypre_ParCSRMatrix *hypre_ParCSRTMatMatKT( hypre_ParCSRMatrix  *A,
             j_indx = C_tmp_offd_j[i];
             C_tmp_offd_j[i] = map_B_to_C[j_indx];
          }
+         hypre_TFree(map_B_to_C);
       }
 
       /*-----------------------------------------------------------------------
@@ -502,8 +505,10 @@ hypre_ParCSRMatrix *hypre_ParCSRTMatMatKT( hypre_ParCSRMatrix  *A,
    hypre_ParCSRMatrixSetRowStartsOwner(C,0);
    hypre_ParCSRMatrixSetColStartsOwner(C,0);
 
+   hypre_CSRMatrixDestroy(hypre_ParCSRMatrixDiag(C));
    hypre_ParCSRMatrixDiag(C) = C_diag;
    
+   hypre_CSRMatrixDestroy(hypre_ParCSRMatrixOffd(C));
    hypre_ParCSRMatrixOffd(C) = C_offd;
    
    hypre_ParCSRMatrixColMapOffd(C) = col_map_offd_C;
@@ -799,7 +804,7 @@ hypre_ParCSRMatrix *hypre_ParCSRMatrixRAPKT( hypre_ParCSRMatrix *R,
 
          hypre_CSRMatrixDestroy(C_ext);
          C_ext = NULL;
-	 if (C_ext_offd->num_nonzeros == 0) C_ext_offd->num_cols = 0;
+	 /*if (C_ext_offd->num_nonzeros == 0) C_ext_offd->num_cols = 0;*/
       }
 
       if (num_cols_offd_Q && C_tmp_offd->num_cols)
