@@ -22,6 +22,7 @@
 
 
 #include "_hypre_parcsr_ls.h"
+#include "par_abstract_out_csr.h"
 
 
 /*==========================================================================*/
@@ -92,15 +93,6 @@
   
   @see */
 /*--------------------------------------------------------------------------*/
-
-#define foreach_nonzero(matrix, row, offset, index)\
-   for (index=matrix##_i[row], offset=matrix##_j[index]; index < matrix##_i[row+1]; index++, offset=matrix##_j[index])
-
-#define foreach_nonzero_diag(matrix, row, offset, index)\
-   for (index=matrix##_diag_i[row], offset=matrix##_diag_j[index]; index < matrix##_diag_i[row+1]; index++, offset=matrix##_diag_j[index])
-
-#define foreach_nonzero_offd(matrix, row, index, offset)\
-   for (index=matrix##_offd_i[row], offset=matrix##_offd_j[index]; index < matrix##_offd_i[row+1]; index++, offset=matrix##_offd_j[index])
 
 #define C_PT  1
 #define F_PT -1
@@ -789,7 +781,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (k = S_diag_i[j]; k < S_diag_i[j+1]; k++)
             //{
             //nabor = S_diag_j[k];
-            foreach_nonzero_diag(S, j, nabor, k)
+            foreach_nonzero(S_diag, j, nabor, k)
             {
                if (CF_marker[nabor] != SF_PT && CF_marker[nabor] != SC_PT)
                {
@@ -862,7 +854,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (k = S_diag_i[nabor]; k < S_diag_i[nabor+1]; k++)
             //{
             //nabor_two = S_diag_j[k];
-            foreach_nonzero_diag(S, nabor, nabor_two, k)
+            foreach_nonzero(S_diag, nabor, nabor_two, k)
             {
                if (CF_marker[nabor_two] == UNDECIDED)
                {
@@ -881,7 +873,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
       //for (j = S_diag_i[index]; j < S_diag_i[index+1]; j++)
       //{
       //nabor = S_diag_j[j];
-      foreach_nonzero_diag(S, index, nabor, j)
+      foreach_nonzero(S_diag, index, nabor, j)
       {
          if (CF_marker[nabor] == UNDECIDED)
          {
@@ -902,7 +894,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
                //for (k = S_diag_i[nabor]; k < S_diag_i[nabor+1]; k++)
                //{
                //nabor_two = S_diag_j[k];
-               foreach_nonzero_diag(S, nabor, nabor_two, k)
+               foreach_nonzero(S_diag, nabor, nabor_two, k)
                {
                   if (CF_marker[nabor_two] == UNDECIDED)
                   {
@@ -1005,7 +997,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (ji = S_diag_i[i]; ji < S_diag_i[i+1]; ji++)
             //{
             //j = S_diag_j[ji];
-            foreach_nonzero_diag(S, i, j, ji)
+            foreach_nonzero(S_diag, i, j, ji)
             {
                if (CF_marker[j] > 0)
                   graph_array[j] = i;
@@ -1013,7 +1005,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (ji = S_offd_i[i]; ji < S_offd_i[i+1]; ji++)
             //{
             //j = S_offd_j[ji];
-            foreach_nonzero_offd(S, i, j, ji)
+            foreach_nonzero(S_offd, i, j, ji)
             {
                if (CF_marker_offd[j] > 0)
                   ci_array[j] = i;
@@ -1021,7 +1013,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (ji = S_diag_i[i]; ji < S_diag_i[i+1]; ji++)
             //{
             //j = S_diag_j[ji];
-            foreach_nonzero_diag(S, i, j, ji)
+            foreach_nonzero(S_diag, i, j, ji)
             {
                if (CF_marker[j] == -1)
                {
@@ -1029,7 +1021,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
                   //for (jj = S_diag_i[j]; jj < S_diag_i[j+1]; jj++)
                   //{
                   //index = S_diag_j[jj];
-                  foreach_nonzero_diag(S, j, index, jj)
+                  foreach_nonzero(S_diag, j, index, jj)
                   {
                      if (graph_array[index] == i)
                      {
@@ -1042,7 +1034,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
                      //for (jj = S_offd_i[j]; jj < S_offd_i[j+1]; jj++)
                      //{
                      //index = S_offd_j[jj];
-                     foreach_nonzero_offd(S, j, index, jj)
+                     foreach_nonzero(S_offd, j, index, jj)
                      {
                         if (ci_array[index] == i)
                         {
@@ -1088,7 +1080,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
                //for (ji = S_offd_i[i]; ji < S_offd_i[i+1]; ji++)
                //{
                //j = S_offd_j[ji];
-               foreach_nonzero_offd(S, i, j, ji)
+               foreach_nonzero(S_offd, i, j, ji)
                {
                   if (CF_marker_offd[j] == -1)
                   {
@@ -1163,7 +1155,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
    	    //for (ji = S_diag_i[i]; ji < S_diag_i[i+1]; ji++)
    	    //{
             //j = S_diag_j[ji];
-            foreach_nonzero_diag(S, i, j, ji)
+            foreach_nonzero(S_diag, i, j, ji)
             {
    	       if (CF_marker[j] > 0)
    	          graph_array[j] = i;
@@ -1171,7 +1163,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
    	    //for (ji = S_diag_i[i]; ji < S_diag_i[i+1]; ji++)
    	    //{
             //j = S_diag_j[ji];
-            foreach_nonzero_diag(S, i, j, ji)
+            foreach_nonzero(S_diag, i, j, ji)
             {
    	       if (CF_marker[j] == -1)
    	       {
@@ -1179,7 +1171,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
    	          //for (jj = S_diag_i[j]; jj < S_diag_i[j+1]; jj++)
    	          //{
                   //index = S_diag_j[jj];
-                  foreach_nonzero_diag(S, j, index, jj)
+                  foreach_nonzero(S_diag, j, index, jj)
                   {
    		     if (graph_array[index] == i)
    		     {
@@ -1301,7 +1293,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
    	             //for (jj = S_diag_i[j]; jj < S_diag_i[j+1]; jj++)
    	             //{
                      //index = S_diag_j[jj];
-                     foreach_nonzero_diag(S, j, index, jj)
+                     foreach_nonzero(S_diag, j, index, jj)
                      {
    		        if (graph_array[index] == i)
    		        {
@@ -1312,7 +1304,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
    	             //for (jj = S_offd_i[j]; jj < S_offd_i[j+1]; jj++)
    	             //{
                      //index = S_offd_j[jj];
-                     foreach_nonzero_offd(S, j, index, jj)
+                     foreach_nonzero(S_offd, j, index, jj)
                      {
    		        if (ci_array[index] == i)
    		        {
@@ -1525,7 +1517,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (ji = S_diag_i[i]; ji < S_diag_i[i+1]; ji++)
             //{
             //j = S_diag_j[ji];
-            foreach_nonzero_diag(S, i, j, ji)
+            foreach_nonzero(S_diag, i, j, ji)
             {
                if (CF_marker[j] > 0)
                   graph_array[j] = i;
@@ -1533,7 +1525,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (ji = S_offd_i[i]; ji < S_offd_i[i+1]; ji++)
             //{
             //j = S_offd_j[ji];
-            foreach_nonzero_offd(S, i, j, ji)
+            foreach_nonzero(S_offd, i, j, ji)
             {
                if (CF_marker_offd[j] > 0)
                   ci_array[j] = i;
@@ -1541,7 +1533,7 @@ hypre_BoomerAMGCoarsenRuge( hypre_ParCSRMatrix    *S,
             //for (ji = S_offd_i[i]; ji < S_offd_i[i+1]; ji++)
             //{
             //j = S_offd_j[ji];
-            foreach_nonzero_offd(S, i, j, ji)
+            foreach_nonzero(S_offd, i, j, ji)
             {
                if (CF_marker_offd[j] == -1)
                {

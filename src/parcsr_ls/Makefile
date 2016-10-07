@@ -79,6 +79,7 @@ FILES =\
  HYPRE_ams.c\
  HYPRE_ads.c\
  HYPRE_ame.c\
+ par_abstract_out_csr.c\
  par_amg.c\
  par_amg_setup.c\
  par_amg_solve.c\

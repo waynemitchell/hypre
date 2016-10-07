@@ -188,7 +188,7 @@ main( hypre_int argc,
    HYPRE_Int      interp_type  = 6; /* default value */
    HYPRE_Int      post_interp_type  = 0; /* default value */
    /* aggressive coarsening */
-   HYPRE_Int      agg_interp_type  = 4; /* default value */
+   HYPRE_Int      agg_interp_type  = 1; /* default value */
    HYPRE_Int      agg_P_max_elmts  = 0; /* default value */
    HYPRE_Int      agg_P12_max_elmts  = 0; /* default value */
    HYPRE_Real   agg_trunc_factor  = 0; /* default value */

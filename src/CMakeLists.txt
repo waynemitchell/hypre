@@ -461,6 +461,7 @@ list (APPEND HYPRE_SOURCES
   parcsr_ls/HYPRE_ams.c
   parcsr_ls/HYPRE_ads.c
   parcsr_ls/HYPRE_ame.c
+  parcsr_ls/par_abstract_out_csr.c
   parcsr_ls/par_amg.c
   parcsr_ls/par_amg_setup.c
   parcsr_ls/par_amg_solve.c
