@@ -2760,16 +2760,16 @@ hypre_BoomerAMGInterpTruncation( hypre_ParCSRMatrix *P,
                }
             }
          } /* end loop for (i = 0; i < n_fine; i++) */
-          
+
          /* store number of dropped elements and number of threads */
          if(my_thread_num == 0)
          {   max_num_threads[0] = num_threads; }
          num_lost_per_thread[my_thread_num] = num_lost;
          num_lost_offd_per_thread[my_thread_num] = num_lost_offd;
-       
+
       } /* end if (trunc_factor > 0) */
-      
-       
+
+
       /* 
        * Truncate based on capping the nnz per row  
        * 
@@ -3772,7 +3772,7 @@ hypre_BoomerAMGBuildInterpModUnk( hypre_ParCSRMatrix   *A,
             diagonal = A_diag_data[A_diag_i[i]];
 #endif
 
-     
+
             /* Loop over ith row of A.  First, the diagonal part of A */
 
             for (jj = A_diag_i[i]+1; jj < A_diag_i[i+1]; jj++)

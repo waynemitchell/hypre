@@ -1,7 +1,5 @@
 #include "_hypre_parcsr_ls.h"
 
-// Ideally would pass in P instead of P_diag_i,
-// but it is not allocated when this routine is called.
 void SetNonZeroOffset(HYPRE_Int *A_csr_i, HYPRE_Int node, HYPRE_Int offset)
 {
    A_csr_i[node] = offset;
@@ -17,6 +15,8 @@ void AccumulateNonZeroOffset(HYPRE_Int *A_csr_i, HYPRE_Int node, HYPRE_Int offse
    A_csr_i[node] += offset;
 }
 
+// Ideally would pass in P instead of P_diag_i,
+// but it is not allocated when this routine is called.
 void OnCPointSetAndInc(HYPRE_Int *P_diag_i, HYPRE_Int *P_marker,
                        HYPRE_Int *jj_counter, HYPRE_Int node, HYPRE_Int node1)
 {
@@ -267,4 +267,44 @@ void CompressP(hypre_ParCSRMatrix *A, hypre_ParCSRMatrix *P,
    } 
 
    hypre_GetCommPkgRTFromCommPkgA(P,A, fine_to_coarse_offd);
+}
+
+void InterpolateWeightStdInterp(HYPRE_Int *P_j, HYPRE_Real *P_data,
+                                HYPRE_Int *ihat, HYPRE_Real *ahat,
+                                HYPRE_Real alfa, HYPRE_Real beta,
+                                HYPRE_Int begin_row, HYPRE_Int end_row,
+                                HYPRE_Int *fine_to_coarse)
+{
+   HYPRE_Int j1, jj;
+
+   for (jj = begin_row; jj < end_row; jj++)
+   {
+      j1 = ihat[P_j[jj]];
+      if (ahat[j1] > 0)
+         P_data[jj] = -beta*ahat[j1];
+      else 
+         P_data[jj] = -alfa*ahat[j1];
+
+      P_j[jj] = fine_to_coarse[P_j[jj]];
+      ahat[j1] = 0;
+   }
+}
+
+void InterpolateWeightStdInterpNoFToC(HYPRE_Int *P_j, HYPRE_Real *P_data,
+                                      HYPRE_Int *ihat, HYPRE_Real *ahat,
+                                      HYPRE_Real alfa, HYPRE_Real beta,
+                                      HYPRE_Int begin_row, HYPRE_Int end_row)
+{
+   HYPRE_Int j1, jj;
+
+   for (jj = begin_row; jj < end_row; jj++)
+   {
+      j1 = ihat[P_j[jj]];
+      if (ahat[j1] > 0)
+         P_data[jj] = -beta*ahat[j1];
+      else 
+         P_data[jj] = -alfa*ahat[j1];
+
+      ahat[j1] = 0;
+   }
 }
