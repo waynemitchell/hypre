@@ -408,8 +408,7 @@ hypre_BoomerAMGBuildInterp( hypre_ParCSRMatrix   *A,
    P_diag_j    = hypre_CTAlloc(HYPRE_Int, P_diag_size);
    P_diag_data = hypre_CTAlloc(HYPRE_Real, P_diag_size);
 
-   P_diag_i[n_fine] = jj_counter; 
-
+   SetNonZeroOffset(P_diag_i, n_fine, jj_counter);
 
    P_offd_size = jj_counter_offd;
 

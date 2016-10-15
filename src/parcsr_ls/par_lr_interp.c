@@ -219,9 +219,6 @@ hypre_BoomerAMGBuildStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker,
    for (i = 0; i < n_fine; i++)
    {
       SetNonZeroOffset(P_diag_i, i, jj_counter);
-#if 0
-      P_diag_i[i] = jj_counter;
-#endif
       if (num_procs > 1)
          P_offd_i[i] = jj_counter_offd;
 
@@ -339,8 +336,8 @@ hypre_BoomerAMGBuildStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker,
       P_offd_data = hypre_CTAlloc(HYPRE_Real, P_offd_size);
    }
 
-   P_diag_i[n_fine] = jj_counter; 
-   P_offd_i[n_fine] = jj_counter_offd;
+   SetNonZeroOffset(P_diag_i, n_fine, jj_counter);
+   SetNonZeroOffset(P_offd_i, n_fine, jj_counter_offd);
 
    jj_counter = start_indexing;
    jj_counter_offd = start_indexing;
