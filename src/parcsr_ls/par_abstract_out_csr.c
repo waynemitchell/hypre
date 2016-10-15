@@ -106,7 +106,7 @@ void InitSgn(hypre_CSRMatrix *A_csr, HYPRE_Int node, HYPRE_Int *sgn)
    if(A_csr_data[A_csr_i[node]] < 0) *sgn = -1;
 }
 
-// NOTE:  For the remaining functions, the offset value is meant
+// NOTE:  For the following functions, the offset value is meant
 // to be the one that is produced within the foreach_nonzero macros.
 // If using a non-CSR matrix, there may not be an offset per se,
 // but whatever appropriate index is used to dereference a value within
@@ -165,8 +165,8 @@ HYPRE_Int IsCorrectSign(hypre_CSRMatrix *A_csr, HYPRE_Int sgn,
    return sgn * A_csr_data[offset] < 0;
 }
 
-void ScaleBySum(hypre_CSRMatrix *A_csr, HYPRE_Int offset,
-                HYPRE_Real sum, HYPRE_Real *distribute)
+void InitDistribute(hypre_CSRMatrix *A_csr, HYPRE_Int offset,
+                    HYPRE_Real sum, HYPRE_Real *distribute)
 {
    HYPRE_Real *A_csr_data = hypre_CSRMatrixData(A_csr);
 
@@ -269,11 +269,87 @@ void CompressP(hypre_ParCSRMatrix *A, hypre_ParCSRMatrix *P,
    hypre_GetCommPkgRTFromCommPkgA(P,A, fine_to_coarse_offd);
 }
 
+/* The remaining functions are specific to StdInterp */
+
+void InitAhatStdInterp(hypre_CSRMatrix *A_csr, HYPRE_Int node,
+                       HYPRE_Real *ahat, HYPRE_Int *cnt_f)
+{
+   HYPRE_Real *A_csr_data = hypre_CSRMatrixData(A_csr);
+   HYPRE_Int  *A_csr_i = hypre_CSRMatrixI(A_csr);
+
+   ahat[(*cnt_f)++] = A_csr_data[A_csr_i[node]];
+}
+
+void InitDistributeStdInterp(hypre_CSRMatrix *A_csr, hypre_CSRMatrix *B_csr,
+                             HYPRE_Int node, HYPRE_Int offset,
+                             HYPRE_Real *distribute)
+{
+   HYPRE_Real *A_csr_data = hypre_CSRMatrixData(A_csr);
+   HYPRE_Int  *A_csr_i = hypre_CSRMatrixI(A_csr);
+   HYPRE_Real *B_csr_data = hypre_CSRMatrixData(B_csr);
+
+   *distribute = B_csr_data[offset]/A_csr_data[A_csr_i[node]];
+}
+
+void AccumulateConnectionStdInterp(hypre_CSRMatrix *A_csr, HYPRE_Int *ihat,
+                                   HYPRE_Int *ipnt, HYPRE_Real *ahat,
+                                   HYPRE_Int *cnt_c, HYPRE_Int *cnt_f,
+                                   HYPRE_Int *P_marker, HYPRE_Int *CF_marker,
+                                   HYPRE_Int begin_row, HYPRE_Int column,
+                                   HYPRE_Int offset)
+{
+   HYPRE_Int indx;
+   HYPRE_Real *A_csr_data = hypre_CSRMatrixData(A_csr);
+
+   indx = ihat[column];
+   if (indx > -1)
+      ahat[indx] += A_csr_data[offset];
+   else if (P_marker[column] >= begin_row)
+   {
+      ihat[column] = *cnt_c;
+      ipnt[*cnt_c] = column;
+      ahat[(*cnt_c)++] += A_csr_data[offset];
+   }
+   else if (CF_marker[column] != -3)
+   {
+      ihat[column] = *cnt_f;
+      ipnt[*cnt_f] = column;
+      ahat[(*cnt_f)++] += A_csr_data[offset];
+   }
+}
+
+void DistributeConnectionStdInterp(hypre_CSRMatrix *A_csr, HYPRE_Int *ihat,
+                                   HYPRE_Int *ipnt, HYPRE_Real *ahat,
+                                   HYPRE_Int *cnt_c, HYPRE_Int *cnt_f,
+                                   HYPRE_Int *P_marker, HYPRE_Int begin_row,
+                                   HYPRE_Int column, HYPRE_Int offset,
+                                   HYPRE_Real distribute)
+{
+   HYPRE_Int indx;
+   HYPRE_Real *A_csr_data = hypre_CSRMatrixData(A_csr);
+
+   indx = ihat[column];
+   if (indx > -1) 
+      ahat[indx] -= A_csr_data[offset]*distribute;
+   else if (P_marker[column] >= begin_row)
+   {
+      ihat[column] = *cnt_c;
+      ipnt[*cnt_c] = column;
+      ahat[(*cnt_c)++] -= A_csr_data[offset]*distribute;
+   }
+   else
+   {
+      ihat[column] = *cnt_f;
+      ipnt[*cnt_f] = column;
+      ahat[(*cnt_f)++] -= A_csr_data[offset]*distribute;
+   }
+}
+
 void InterpolateWeightStdInterp(HYPRE_Int *P_j, HYPRE_Real *P_data,
-                                HYPRE_Int *ihat, HYPRE_Real *ahat,
+                                HYPRE_Int *ihat, HYPRE_Int *ipnt, HYPRE_Real *ahat,
                                 HYPRE_Real alfa, HYPRE_Real beta,
                                 HYPRE_Int begin_row, HYPRE_Int end_row,
-                                HYPRE_Int *fine_to_coarse)
+                                HYPRE_Int cnt_f, HYPRE_Int *fine_to_coarse)
 {
    HYPRE_Int j1, jj;
 
@@ -288,12 +364,16 @@ void InterpolateWeightStdInterp(HYPRE_Int *P_j, HYPRE_Real *P_data,
       P_j[jj] = fine_to_coarse[P_j[jj]];
       ahat[j1] = 0;
    }
+   for (jj=0; jj < cnt_f; jj++)
+      ihat[ipnt[jj]] = -1;
 }
 
 void InterpolateWeightStdInterpNoFToC(HYPRE_Int *P_j, HYPRE_Real *P_data,
-                                      HYPRE_Int *ihat, HYPRE_Real *ahat,
+                                      HYPRE_Int *ihat, HYPRE_Int *ipnt,
+                                      HYPRE_Real *ahat,
                                       HYPRE_Real alfa, HYPRE_Real beta,
-                                      HYPRE_Int begin_row, HYPRE_Int end_row)
+                                      HYPRE_Int begin_row, HYPRE_Int end_row,
+                                      HYPRE_Real cnt_f)
 {
    HYPRE_Int j1, jj;
 
@@ -307,4 +387,44 @@ void InterpolateWeightStdInterpNoFToC(HYPRE_Int *P_j, HYPRE_Real *P_data,
 
       ahat[j1] = 0;
    }
+   for (jj=0; jj < cnt_f; jj++)
+      ihat[ipnt[jj]] = -1;
+}
+
+void InterpolateWeightStdInterpNoCheck(HYPRE_Int *P_j, HYPRE_Real *P_data,
+                                       HYPRE_Int *ihat, HYPRE_Int *ipnt,
+                                       HYPRE_Real *ahat, HYPRE_Real alfa,
+                                       HYPRE_Int begin_row, HYPRE_Int end_row,
+                                       HYPRE_Real cnt_f,
+                                       HYPRE_Int *fine_to_coarse)
+{
+   HYPRE_Int j1, jj;
+
+   for (jj = begin_row; jj < end_row; jj++)
+   {
+      j1 = ihat[P_j[jj]];
+      P_data[jj] = -alfa*ahat[j1];
+      P_j[jj] = fine_to_coarse[P_j[jj]];
+      ahat[j1] = 0;
+   }
+   for (jj=0; jj < cnt_f; jj++)
+      ihat[ipnt[jj]] = -1;
+}
+
+void InterpolateWeightStdInterpNoCheckNoFToC(HYPRE_Int *P_j, HYPRE_Real *P_data,
+                                             HYPRE_Int *ihat, HYPRE_Int *ipnt,
+                                             HYPRE_Real *ahat, HYPRE_Real alfa,
+                                             HYPRE_Int begin_row, HYPRE_Int end_row,
+                                             HYPRE_Real cnt_f)
+{
+   HYPRE_Int j1, jj;
+
+   for (jj = begin_row; jj < end_row; jj++)
+   {
+      j1 = ihat[P_j[jj]];
+      P_data[jj] = -alfa*ahat[j1];
+      ahat[j1] = 0;
+   }
+   for (jj=0; jj < cnt_f; jj++)
+      ihat[ipnt[jj]] = -1;
 }

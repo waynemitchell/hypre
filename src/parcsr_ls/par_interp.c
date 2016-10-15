@@ -707,7 +707,7 @@ hypre_BoomerAMGBuildInterp( hypre_ParCSRMatrix   *A,
 
                   if (sum != 0)
                   {
-                     ScaleBySum(A_diag, jj, sum, &distribute);
+                     InitDistribute(A_diag, jj, sum, &distribute);
 
                      /*-----------------------------------------------------------
                       * Loop over row of A for point i1 and do the distribution.
@@ -827,7 +827,7 @@ hypre_BoomerAMGBuildInterp( hypre_ParCSRMatrix   *A,
 
                      if (sum != 0)
                      {
-                        ScaleBySum(A_offd, jj, sum, &distribute);
+                        InitDistribute(A_offd, jj, sum, &distribute);
 
                         /*---------------------------------------------------------
                          * Loop over row of A_ext for point i1 and do 

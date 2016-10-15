@@ -629,7 +629,7 @@ hypre_BoomerAMGBuildPartialExtPIInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_mark
                   }
                   if(sum != 0)
                   {
-                     ScaleBySum(A_diag, jj, sum, &distribute);
+                     InitDistribute(A_diag, jj, sum, &distribute);
 
                      /* Loop over row of A for point i1 and do the distribution */
                      foreach_nonzero_skipfirst(A_diag, i1, i2, jj1)
@@ -692,7 +692,7 @@ hypre_BoomerAMGBuildPartialExtPIInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_mark
                      }
                      if(sum != 0)
                      {
-                        ScaleBySum(A_offd, jj, sum, &distribute);
+                        InitDistribute(A_offd, jj, sum, &distribute);
 
                         foreach_nonzero(A_ext, i1, k1, jj1)
                         {
@@ -985,7 +985,7 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
       hypre_MatvecCommPkgCreate(A);
       comm_pkg = hypre_ParCSRMatrixCommPkg(A); 
    }
-   
+
    /* Set up off processor information (specifically for neighbors of 
     * neighbors */
    full_off_procNodes = 0;
@@ -1085,11 +1085,7 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
          {
             if (CF_marker[i1] > 0)
             { /* i1 is a C point */
-               if (P_marker[i1] < P_diag_i[ii])
-               {
-                  P_marker[i1] = jj_counter;
-                  jj_counter++;
-               }
+               OnCPointSetAndInc(P_diag_i, P_marker, &jj_counter, ii, i1);
             }
             else if (CF_marker[i1] != -3)
             { /* i1 is a F point, loop through it's strong neighbors */
@@ -1097,11 +1093,7 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                {
                   if (CF_marker[k1] > 0)
                   {
-                     if(P_marker[k1] < P_diag_i[ii])
-                     {
-                        P_marker[k1] = jj_counter;
-                        jj_counter++;
-                     }
+                     OnCPointSetAndInc(P_diag_i, P_marker, &jj_counter, ii, k1);
                   } 
                }
                if(num_procs > 1)
@@ -1110,12 +1102,9 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                   {
                      if (CF_marker_offd[k1] > 0)
                      {
-                        if(P_marker_offd[k1] < P_offd_i[ii])
-                        {
-                           tmp_CF_marker_offd[k1] = 1;
-                           P_marker_offd[k1] = jj_counter_offd;
-                           jj_counter_offd++;
-                        }
+                        OnCPointSetAndInc_WithCF(P_offd_i, P_marker_offd,
+                                                 tmp_CF_marker_offd,
+                                                 &jj_counter_offd, ii, k1);
                      }
                   }
                }
@@ -1128,12 +1117,9 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
             {
                if (CF_marker_offd[i1] > 0)
                {
-                  if(P_marker_offd[i1] < P_offd_i[ii])
-                  {
-                     tmp_CF_marker_offd[i1] = 1;
-                     P_marker_offd[i1] = jj_counter_offd;
-                     jj_counter_offd++;
-                  }
+                  OnCPointSetAndInc_WithCF(P_offd_i, P_marker_offd,
+                                           tmp_CF_marker_offd,
+                                           &jj_counter_offd, ii, i1);
                }
                else if (CF_marker_offd[i1] != -3)
                { /* F point; look at neighbors of i1. Sop contains global col
@@ -1146,11 +1132,7 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                         loc_col = k1-col_1;
                         if(CF_marker[loc_col] >= 0)
                         {
-                           if(P_marker[loc_col] < P_diag_i[ii])
-                           {
-                              P_marker[loc_col] = jj_counter;
-                              jj_counter++;
-                           }
+                           OnCPointSetAndInc(P_diag_i, P_marker, &jj_counter, ii, loc_col);
                         }
                      }
                      else
@@ -1158,12 +1140,9 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                         loc_col = -k1 - 1;
                         if(CF_marker_offd[loc_col] >= 0)
                         {
-                           if(P_marker_offd[loc_col] < P_offd_i[ii])
-                           {
-                              P_marker_offd[loc_col] = jj_counter_offd;
-                              tmp_CF_marker_offd[loc_col] = 1;
-                              jj_counter_offd++;
-                           }
+                           OnCPointSetAndInc_WithCF(P_offd_i, P_marker_offd,
+                                                    tmp_CF_marker_offd,
+                                                    &jj_counter_offd, ii, loc_col);
                         }
                      }
                   }
@@ -1328,25 +1307,12 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
          {
             foreach_nonzero_mapped(S_offd, i, i1, jj, col_offd_S_to_A)
             {
-#if 0
-            for (jj=S_offd_i[i]; jj < S_offd_i[i+1]; jj++)
-            {
-               i1 = S_offd_j[jj];
-               if(col_offd_S_to_A)
-                  i1 = col_offd_S_to_A[i1];
-#endif
                if ( CF_marker_offd[i1] > 0)
                {
                   if(P_marker_offd[i1] < jj_begin_row_offd)
                   {
                      InterpSetZeroNoFToC(P_offd_j, P_offd_data, P_marker_offd,
                                          i1, &jj_counter);
-#if 0
-                     P_marker_offd[i1] = jj_counter_offd;
-                     P_offd_j[jj_counter_offd]=i1;
-                     P_offd_data[jj_counter_offd] = zero;
-                     jj_counter_offd++;
-#endif
                   }
                }
                else if (CF_marker_offd[i1] != -3)
@@ -1354,11 +1320,6 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                   P_marker_offd[i1] = strong_f_marker;
                   foreach_nonzero(Sop, i1, k1, kk)
                   {
-#if 0
-                  for(kk = Sop_i[i1]; kk < Sop_i[i1+1]; kk++)
-                  {
-                     k1 = Sop_j[kk];
-#endif
                      if(k1 >= col_1 && k1 < col_n)
                      {
                         loc_col = k1-col_1;
@@ -1369,12 +1330,6 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                               InterpSetZeroNoFToC(P_diag_j, P_diag_data,
                                                   P_marker, loc_col,
                                                   &jj_counter);
-#if 0
-                              P_marker[loc_col] = jj_counter;
-                              P_diag_j[jj_counter] = loc_col;
-                              P_diag_data[jj_counter] = zero;
-                              jj_counter++;
-#endif
                            }
                         }
                      }
@@ -1388,12 +1343,6 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                               InterpSetZeroNoFToC(P_offd_j, P_offd_data,
                                                   P_marker_offd, loc_col,
                                                   &jj_counter_offd);
-#if 0
-                              P_marker_offd[loc_col] = jj_counter_offd;
-                              P_offd_j[jj_counter_offd]=loc_col;
-                              P_offd_data[jj_counter_offd] = zero;
-                              jj_counter_offd++;
-#endif
                            }
                         }
                      }
@@ -1418,74 +1367,44 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
          cnt_f_offd = jj_end_row_offd-jj_begin_row_offd;
          ihat[i] = cnt_f;
          ipnt[cnt_f] = i;
-         ahat[cnt_f++] = A_diag_data[A_diag_i[i]];
-         for (jj = A_diag_i[i]+1; jj < A_diag_i[i+1]; jj++)
+         InitAhatStdInterp(A_diag, i, ahat, &cnt_f);
+         foreach_nonzero_skipfirst(A_diag, i, i1, jj)
          { /* i1 is direct neighbor */
-            i1 = A_diag_j[jj];
             if (P_marker[i1] != strong_f_marker)
             {
-               indx = ihat[i1];
-               if (indx > -1)
-                  ahat[indx] += A_diag_data[jj];
-               else if (P_marker[i1] >= jj_begin_row)
-               {
-                  ihat[i1] = cnt_c;
-                  ipnt[cnt_c] = i1;
-                  ahat[cnt_c++] += A_diag_data[jj];
-               }
-               else if (CF_marker[i1] != -3)
-               {
-                  ihat[i1] = cnt_f;
-                  ipnt[cnt_f] = i1;
-                  ahat[cnt_f++] += A_diag_data[jj];
-               }
+               AccumulateConnectionStdInterp(A_diag, ihat, ipnt, ahat,
+                                             &cnt_c, &cnt_f, P_marker,
+                                             CF_marker, jj_begin_row,
+                                             i1, jj);
             }
             else 
             {
                if(num_functions == 1 || dof_func[i] == dof_func[i1])
                {
-                  distribute = A_diag_data[jj]/A_diag_data[A_diag_i[i1]];
-                  for (kk = A_diag_i[i1]+1; kk < A_diag_i[i1+1]; kk++)
+                  InitDistributeStdInterp(A_diag, A_diag, i1, jj, &distribute);
+                  foreach_nonzero_skipfirst(A_diag, i1, k1, kk)
                   {
-                     k1 = A_diag_j[kk];
-                     indx = ihat[k1];
-                     if (indx > -1) 
-                        ahat[indx] -= A_diag_data[kk]*distribute;
-                     else if (P_marker[k1] >= jj_begin_row)
-                     {
-                        ihat[k1] = cnt_c;
-                        ipnt[cnt_c] = k1;
-                        ahat[cnt_c++] -= A_diag_data[kk]*distribute;
-                     }
-                     else
-                     {
-                        ihat[k1] = cnt_f;
-                        ipnt[cnt_f] = k1;
-                        ahat[cnt_f++] -= A_diag_data[kk]*distribute;
-                     }
+                     DistributeConnectionStdInterp(A_diag, ihat, ipnt, ahat,
+                                                   &cnt_c, &cnt_f,
+                                                   P_marker, jj_begin_row,
+                                                   k1, kk, distribute);
                   }
                   if(num_procs > 1)
                   {
-                     for (kk = A_offd_i[i1]; kk < A_offd_i[i1+1]; kk++)
+                     foreach_nonzero(A_offd, i1, k1, kk)
                      {
-                        k1 = A_offd_j[kk];
+                        
                         indx = ihat_offd[k1];
                         if(num_functions == 1 || dof_func[i1] == dof_func_offd[k1])
                         {
-                           if (indx > -1)
-                              ahat_offd[indx] -= A_offd_data[kk]*distribute;
-                           else if (P_marker_offd[k1] >= jj_begin_row_offd)
-                           {
-                              ihat_offd[k1] = cnt_c_offd;
-                              ipnt_offd[cnt_c_offd] = k1;
-                              ahat_offd[cnt_c_offd++] -= A_offd_data[kk]*distribute;
-                           }
-                           else
-                           {
-                              ihat_offd[k1] = cnt_f_offd;
-                              ipnt_offd[cnt_f_offd] = k1;
-                              ahat_offd[cnt_f_offd++] -= A_offd_data[kk]*distribute;
-                           }
+                           DistributeConnectionStdInterp(A_offd, ihat_offd,
+                                                         ipnt_offd, ahat_offd,
+                                                         &cnt_c_offd,
+                                                         &cnt_f_offd,
+                                                         P_marker_offd,
+                                                         jj_begin_row_offd,
+                                                         k1, kk,
+                                                         distribute);
                         }
                      }
                   }
@@ -1494,53 +1413,33 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
          }
          if(num_procs > 1)
          {
-            for(jj = A_offd_i[i]; jj < A_offd_i[i+1]; jj++)
+            foreach_nonzero(A_offd, i, i1, jj)
             {
-               i1 = A_offd_j[jj];
                if(P_marker_offd[i1] != strong_f_marker)
                {
-                  indx = ihat_offd[i1];
-                  if (indx > -1)
-                     ahat_offd[indx] += A_offd_data[jj];
-                  else if (P_marker_offd[i1] >= jj_begin_row_offd)
-                  {
-                     ihat_offd[i1] = cnt_c_offd;
-                     ipnt_offd[cnt_c_offd] = i1;
-                     ahat_offd[cnt_c_offd++] += A_offd_data[jj];
-                  }
-                  else if (CF_marker_offd[i1] != -3)
-                  {
-                     ihat_offd[i1] = cnt_f_offd;
-                     ipnt_offd[cnt_f_offd] = i1;
-                     ahat_offd[cnt_f_offd++] += A_offd_data[jj];
-                  }
+                  AccumulateConnectionStdInterp(A_offd, ihat_offd, ipnt_offd,
+                                                ahat_offd, &cnt_c_offd,
+                                                &cnt_f_offd, P_marker_offd,
+                                                CF_marker_offd,
+                                                jj_begin_row_offd, i1, jj);
                }
                else
                {
                   if(num_functions == 1 || dof_func[i] == dof_func_offd[i1])
                   {
-                     distribute = A_offd_data[jj]/A_ext_data[A_ext_i[i1]];
-                     for (kk = A_ext_i[i1]+1; kk < A_ext_i[i1+1]; kk++)
+                     InitDistributeStdInterp(A_ext, A_offd, i1, jj, &distribute);
+                     foreach_nonzero_skipfirst(A_ext, i1, k1, kk)
                      {
-                        k1 = A_ext_j[kk];
                         if(k1 >= col_1 && k1 < col_n)
                         { /*diag*/
                            loc_col = k1 - col_1;
                            indx = ihat[loc_col];
-                           if (indx > -1)
-                              ahat[indx] -= A_ext_data[kk]*distribute;
-                           else if (P_marker[loc_col] >= jj_begin_row)
-                           {
-                              ihat[loc_col] = cnt_c;
-                              ipnt[cnt_c] = loc_col;
-                              ahat[cnt_c++] -= A_ext_data[kk]*distribute;
-                           }
-                           else 
-                           {
-                              ihat[loc_col] = cnt_f;
-                              ipnt[cnt_f] = loc_col;
-                              ahat[cnt_f++] -= A_ext_data[kk]*distribute;
-                           }
+                           DistributeConnectionStdInterp(A_ext, ihat, ipnt, ahat,
+                                                         &cnt_c, &cnt_f,
+                                                         P_marker,
+                                                         jj_begin_row,
+                                                         loc_col, kk,
+                                                         distribute);
                         }
                         else
                         {
@@ -1549,20 +1448,15 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                               dof_func_offd[loc_col] == dof_func_offd[i1])
                            {
                               indx = ihat_offd[loc_col];
-                              if (indx > -1)
-                                 ahat_offd[indx] -= A_ext_data[kk]*distribute;
-                              else if(P_marker_offd[loc_col] >= jj_begin_row_offd)
-                              {
-                                 ihat_offd[loc_col] = cnt_c_offd;
-                                 ipnt_offd[cnt_c_offd] = loc_col;
-                                 ahat_offd[cnt_c_offd++] -= A_ext_data[kk]*distribute;
-                              }
-                              else
-                              {
-                                 ihat_offd[loc_col] = cnt_f_offd;
-                                 ipnt_offd[cnt_f_offd] = loc_col;
-                                 ahat_offd[cnt_f_offd++] -= A_ext_data[kk]*distribute;
-                              }
+                              DistributeConnectionStdInterp(A_ext, ihat_offd,
+                                                            ipnt_offd,
+                                                            ahat_offd,
+                                                            &cnt_c_offd,
+                                                            &cnt_f_offd,
+                                                            P_marker_offd,
+                                                            jj_begin_row_offd,
+                                                            loc_col, kk,
+                                                            distribute);
                            }
                         }
                      }
@@ -1648,34 +1542,17 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
             /*-----------------------------------------------------------------
              * Set interpolation weight by dividing by the diagonal.
              *-----------------------------------------------------------------*/
-       
-            for (jj = jj_begin_row; jj < jj_end_row; jj++)
-            {
-               j1 = ihat[P_diag_j[jj]];
-               if (ahat[j1] > 0)
-                  P_diag_data[jj] = -beta*ahat[j1];
-               else 
-                  P_diag_data[jj] = -alfa*ahat[j1];
-  
-               P_diag_j[jj] = fine_to_coarse[P_diag_j[jj]];
-               ahat[j1] = 0;
-            }
-            for (jj=0; jj < cnt_f; jj++)
-               ihat[ipnt[jj]] = -1;
+
+            InterpolateWeightStdInterp(P_diag_j, P_diag_data,
+                                       ihat, ipnt, ahat, alfa, beta,
+                                       jj_begin_row, jj_end_row,
+                                       cnt_f, fine_to_coarse);
             if(num_procs > 1)
             {
-               for (jj = jj_begin_row_offd; jj < jj_end_row_offd; jj++)
-               {
-                  j1 = ihat_offd[P_offd_j[jj]];
-                  if (ahat_offd[j1] > 0)
-                     P_offd_data[jj] = -beta*ahat_offd[j1];
-                  else 
-                     P_offd_data[jj] = -alfa*ahat_offd[j1];
-	   
-                  ahat_offd[j1] = 0;
-               }
-               for (jj=0; jj < cnt_f_offd; jj++)
-                  ihat_offd[ipnt_offd[jj]] = -1;
+               InterpolateWeightStdInterpNoFToC(P_offd_j, P_offd_data,
+                                                ihat_offd, ipnt_offd, ahat_offd,
+                                                alfa, beta, jj_begin_row_offd,
+                                                jj_end_row_offd, cnt_f_offd);
             }
          }
          else
@@ -1710,26 +1587,19 @@ hypre_BoomerAMGBuildPartialStdInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
             /*-----------------------------------------------------------------
              * Set interpolation weight by dividing by the diagonal.
              *-----------------------------------------------------------------*/
-       
-            for (jj = jj_begin_row; jj < jj_end_row; jj++)
-            {
-               j1 = ihat[P_diag_j[jj]];
-               P_diag_data[jj] = -alfa*ahat[j1];
-               P_diag_j[jj] = fine_to_coarse[P_diag_j[jj]];
-               ahat[j1] = 0;
-            }
-            for (jj=0; jj < cnt_f; jj++)
-               ihat[ipnt[jj]] = -1;
+
+            InterpolateWeightStdInterpNoCheck(P_diag_j, P_diag_data,
+                                              ihat, ipnt, ahat, alfa,
+                                              jj_begin_row, jj_end_row,
+                                              cnt_f, fine_to_coarse);
             if(num_procs > 1)
             {
-               for (jj = jj_begin_row_offd; jj < jj_end_row_offd; jj++)
-               {
-                  j1 = ihat_offd[P_offd_j[jj]];
-                  P_offd_data[jj] = -alfa*ahat_offd[j1];
-                  ahat_offd[j1] = 0;
-               }
-               for (jj=0; jj < cnt_f_offd; jj++)
-                  ihat_offd[ipnt_offd[jj]] = -1;
+               InterpolateWeightStdInterpNoCheckNoFToC(P_offd_j, P_offd_data,
+                                                       ihat_offd, ipnt_offd,
+                                                       ahat_offd, alfa,
+                                                       jj_begin_row_offd,
+                                                       jj_end_row_offd,
+                                                       cnt_f_offd);
             }
          }
          if (debug_flag==4)
@@ -2343,7 +2213,7 @@ hypre_BoomerAMGBuildPartialExtInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                }
                if(sum != 0)
                {
-                  ScaleBySum(A_diag, jj, sum, &distribute);
+                  InitDistribute(A_diag, jj, sum, &distribute);
 
                   /* Loop over row of A for point i1 and do the distribution */
                   foreach_nonzero_skipfirst(A_diag, i1, i2, jj1)
@@ -2404,7 +2274,7 @@ hypre_BoomerAMGBuildPartialExtInterp(hypre_ParCSRMatrix *A, HYPRE_Int *CF_marker
                   }
                   if(sum != 0)
                   {
-                     ScaleBySum(A_offd, jj, sum, &distribute);
+                     InitDistribute(A_offd, jj, sum, &distribute);
                      foreach_nonzero(A_ext, i1, k1, jj1)
                      {
                         if(k1 >= col_1 && k1 < col_n)
