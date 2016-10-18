@@ -17,7 +17,7 @@
  *****************************************************************************/
 
 #include "_hypre_utilities.h"
-
+#include <unistd.h>
 #ifdef HYPRE_USE_UMALLOC
 #undef HYPRE_USE_UMALLOC
 #endif
@@ -72,7 +72,7 @@ hypre_MAlloc( size_t size )
 	} else new_size=size;
 	
 	if (posix_memalign((void**)&ptr,getpagesize(),new_size)){
-	  printf("ERROR:: allocating page aligned memory in hypre_CAlloc of size %d bytes\n",size);
+	  printf("ERROR:: allocating page aligned memory in hypre_CAlloc of size %lu bytes\n",size);
 	} else {
 	  //memset(ptr,0,new_size);
 	}
@@ -115,7 +115,7 @@ hypre_CAlloc( size_t count,
 #ifndef HYPRE_USE_CUDA
       ptr = calloc(count, elt_size);
 #else
-      if (size<0) {
+      if (size<1) {
 	ptr = calloc(count, elt_size);
       } else {
 	size_t new_size;
@@ -128,7 +128,7 @@ hypre_CAlloc( size_t count,
 	} else new_size=size;
 	
 	if (posix_memalign((void**)&ptr,getpagesize(),new_size)){
-	  printf("ERROR:: allocating page aligned memory in hypre_CAlloc of size %d bytes\n",size);
+	  printf("ERROR:: allocating page aligned memory in hypre_CAlloc of size %lu bytes\n",size);
 	} else {
 	  memset(ptr,0,new_size);
 	}

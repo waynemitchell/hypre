@@ -1,8 +1,10 @@
 #ifndef __cusparseErrorCheck__
 #define __cusparseErrorCheck__
+#include <cusparse.h>
 #include <stdio.h>
 #include <cuda_runtime_api.h>
-extern inline const char *cusparseErrorCheck(cusparseStatus_t error)
+#include <stdlib.h>
+inline const char *cusparseErrorCheck(cusparseStatus_t error)
 {
     switch (error)
     {
@@ -32,22 +34,24 @@ extern inline const char *cusparseErrorCheck(cusparseStatus_t error)
 
         case CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED:
             return "CUSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED";
+        default:
+	    return "Some new error";
     }
 
     return "Congrats::Undefined ERRROR";
 }
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-extern inline void gpuAssert(cudaError_t code, const char *file, int line)
+inline void gpuAssert(cudaError_t code, const char *file, int line)
 {
    if (code != cudaSuccess) 
    {
      fprintf(stderr,"CUDA ERROR ( Code = %d) in line %d of file %s\n",code,line,file);
      fprintf(stderr,"CUDA ERROR : %s \n", cudaGetErrorString(code));
-     exit(1);
+     exit(2);
    }
 }
 #define cusparseErrchk(ans) { cusparseAssert((ans), __FILE__, __LINE__); }
-extern inline void cusparseAssert(cusparseStatus_t code, const char *file, int line)
+inline void cusparseAssert(cusparseStatus_t code, const char *file, int line)
 {
    if (code != CUSPARSE_STATUS_SUCCESS) 
    {
@@ -56,6 +60,4 @@ extern inline void cusparseAssert(cusparseStatus_t code, const char *file, int l
    }
 }
 int PointerType(const void *ptr);
-
-
 #endif

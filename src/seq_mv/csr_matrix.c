@@ -902,8 +902,8 @@ void cuda_MatrixDestroy(hypre_CSRMatrix *matrix){
     gpuErrchk(cudaFree(hypre_CSRMatrixIDevice(matrix)));
     gpuErrchk(cudaFree(hypre_CSRMatrixJDevice(matrix)));
     if (hypre_CSRMatrixDevice(matrix)->l1_norms_device) gpuErrchk(cudaFree(hypre_CSRMatrixDevice(matrix)->l1_norms_device));
-    gpuErrchk(cusparseDestroyMatDescr(hypre_CSRMatrixDescr(matrix)));
-    gpuErrchk(cusparseDestroy(hypre_CSRMatrixHandle(matrix)));
+    cusparseErrchk(cusparseDestroyMatDescr(hypre_CSRMatrixDescr(matrix)));
+    cusparseErrchk(cusparseDestroy(hypre_CSRMatrixHandle(matrix)));
     hypre_TFree(hypre_CSRMatrixDevice(matrix));
     hypre_CSRMatrixDevice(matrix)=NULL;
   }

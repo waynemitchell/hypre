@@ -41,7 +41,9 @@ FILES =\
  HYPRE_vector.c\
  mapped_matrix.c\
  multiblock_matrix.c\
- vector.c 
+ vector.c\
+ cudaErrorCheck.c
+
 
 CFILES = vecscale.cu
 OBJS = ${FILES:.c=.o}

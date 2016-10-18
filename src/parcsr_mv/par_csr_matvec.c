@@ -19,6 +19,14 @@
 #include "_hypre_parcsr_mv.h"
 #include <assert.h>
 
+HYPRE_Int
+hypre_ParCSRMatrixMatvecOutOfPlaceSpec( HYPRE_Complex       alpha,
+                                    hypre_ParCSRMatrix *A,
+                                    hypre_ParVector    *x,
+                                    HYPRE_Complex       beta,
+                                    hypre_ParVector    *b,
+				    hypre_ParVector    *y,
+					HYPRE_Real *l1_norms);
 /*--------------------------------------------------------------------------
  * hypre_ParCSRMatrixMatvec
  *--------------------------------------------------------------------------*/

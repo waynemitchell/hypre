@@ -18,7 +18,7 @@
 
 #include "seq_mv.h"
 #include <assert.h>
-
+#include <unistd.h>
 /*--------------------------------------------------------------------------
  * hypre_SeqVectorCreate
  *--------------------------------------------------------------------------*/
@@ -558,7 +558,7 @@ void hypre_VectorMapToDevice(hypre_Vector *vector){
     //cudaError_t code=cudaSuccess;
     if (code != cudaSuccess) 
        {
-	 printf("Failed to register pointer %p of size %d CODE %d\n",hypre_VectorData(vector),size,code);
+	 printf("Failed to register pointer %p of size %lu CODE %d\n",hypre_VectorData(vector),size,code);
 	 //printf("Register fail: %s size = %d\n", cudaGetErrorString(code), size);
        }
   }
@@ -588,7 +588,7 @@ HYPRE_Int hypre_VectorH2D(hypre_Vector *vector){
 		       (size_t)(vector->size*sizeof(HYPRE_Complex)), 
 		       cudaMemcpyHostToDevice));
   POP_RANGE;
-  
+  return 0;
 }
 
 void hypre_VectorD2H(hypre_Vector *vector){
@@ -597,6 +597,7 @@ void hypre_VectorD2H(hypre_Vector *vector){
 		   (size_t)(vector->size*sizeof(HYPRE_Complex)), 
 			cudaMemcpyDeviceToHost));
   POP_RANGE;
+  return;
 }
 
 void hypre_VectorD2HCross(hypre_Vector *dest, hypre_Vector *src,int offset, int size){
@@ -615,6 +616,7 @@ HYPRE_Int hypre_VectorH2DAsync(hypre_Vector *vector,cudaStream_t s){
 		       (size_t)(vector->size*sizeof(HYPRE_Complex)), 
 			    cudaMemcpyHostToDevice,s));
   POP_RANGE;
+return 0;
   
 }
 HYPRE_Int hypre_VectorH2DAsyncPartial(hypre_Vector *vector,size_t size,cudaStream_t s){
@@ -623,7 +625,7 @@ HYPRE_Int hypre_VectorH2DAsyncPartial(hypre_Vector *vector,size_t size,cudaStrea
 		       (size_t)(size*sizeof(HYPRE_Complex)), 
 			    cudaMemcpyHostToDevice,s));
   POP_RANGE;
-  
+  return 0;
 }
 void hypre_VectorD2HAsync(hypre_Vector *vector,cudaStream_t s){
   PUSH_RANGE("VecDataRecvAsync",1);
