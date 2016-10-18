@@ -262,10 +262,10 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
    } else {
      y_local->dev->ref_count++; // No offd, vecscale can be done on device
      if (y_local->dev->ref_count==2){
-
        gpuErrchk(cudaEventRecord(y_local->dev->event,y_local->dev->s0));
        gpuErrchk(cudaStreamWaitEvent(y_local->dev->s1,y_local->dev->event,0));
        hypre_VectorD2HCrossAsync(y_local,y_local,y_local->dev->offset1,y_local->dev->offset2-y_local->dev->offset1,y_local->dev->s0);
+       if (!y_local->dev->nosync) cudaStreamSynchronize(y_local->dev->s0);
      }
    }
  POP_RANGE
@@ -923,6 +923,7 @@ hypre_ParCSRMatrixMatvecOutOfPlaceSpec( HYPRE_Complex       alpha,
 
    return ierr;
 }
+#endif
 /*--------------------------------------------------------------------------
  * hypre_ParCSRMatrixMatvec
  *--------------------------------------------------------------------------*/
@@ -1156,4 +1157,3 @@ hypre_ParCSRMatrixMatvecOutOfPlaceBaseline( HYPRE_Complex       alpha,
    return ierr;
 }
 
-#endif
