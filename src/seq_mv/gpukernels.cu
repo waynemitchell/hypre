@@ -155,6 +155,27 @@ extern "C"{
 
 
 extern "C"{
+  __global__ 
+void CSRDiagScaleKernel(HYPRE_Real *x_data, HYPRE_Real *y_data, HYPRE_Real *A_data, hypre_int *A_i, hypre_int local_size)
+  {
+    hypre_int i= blockIdx.x * blockDim.x + threadIdx.x;
+    if (i<local_size){
+      x_data[i] = y_data[i]/A_data[A_i[i]];
+    }
+  }
+  void CSRDiagScale(HYPRE_Real *x_data, HYPRE_Real *y_data, HYPRE_Real *A_data, hypre_int *A_i, hypre_int local_size){
+    hypre_int num_threads=1024;
+    hypre_int num_blocks=local_size/num_threads+1;
+    CSRDiagScaleKernel<<<num_blocks,num_threads,0,HYPRE_STREAM(4)>>>(x_data,y_data,A_data,A_i,local_size);
+    gpuErrchk2(cudaStreamSynchronize(HYPRE_STREAM(4)));
+  }
+}
+
+
+
+
+
+extern "C"{
 __global__
 void SpMVCudaKernel(HYPRE_Complex* __restrict__ y,HYPRE_Complex alpha, const HYPRE_Complex* __restrict__ A_data, const hypre_int* __restrict__ A_i, const hypre_int* __restrict__ A_j, const HYPRE_Complex* __restrict__ x, HYPRE_Complex beta, hypre_int num_rows)
 {

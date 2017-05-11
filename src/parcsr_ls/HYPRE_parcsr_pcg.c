@@ -253,6 +253,13 @@ HYPRE_ParCSRDiagScale( HYPRE_Solver solver,
    HYPRE_Int *A_i = hypre_CSRMatrixI(hypre_ParCSRMatrixDiag(A));
    HYPRE_Int local_size = hypre_VectorSize(hypre_ParVectorLocalVector(x));
    HYPRE_Int i, ierr = 0;
+   
+#ifdef HYPRE_USE_GPU
+   PUSH_RANGE("HYPRE_ParCSRDiagScale",3);
+   CSRDiagScale(x_data,y_data,A_data,A_i,local_size);
+   POP_RANGE;
+   return ierr;
+#endif
 
    for (i=0; i < local_size; i++)
    {
@@ -261,6 +268,8 @@ HYPRE_ParCSRDiagScale( HYPRE_Solver solver,
  
    return ierr;
 }
+
+
 
 /*--------------------------------------------------------------------------
  * HYPRE_ParCSRSymPrecondSetup

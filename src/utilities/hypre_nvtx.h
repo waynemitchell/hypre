@@ -68,5 +68,6 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #define PUSH_RANGE_PAYLOAD(name,cid,load)
 #define PUSH_RANGE_DOMAIN(name,cid,domainName)
+#define POP_RANGE_DOMAIN(dId)
 #endif
 

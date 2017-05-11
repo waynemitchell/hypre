@@ -15,7 +15,7 @@
 #define CUDAMEMATTACHTYPE cudaMemAttachGlobal
 #define MEM_PAD_LEN 1
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line)
+static inline void gpuAssert(cudaError_t code, const char *file, int line)
 {
    if (code != cudaSuccess) 
    {
@@ -43,7 +43,7 @@ hypre_int PointerAttributes(const void *ptr);
 #include <stdio.h>
 //#include <cuda_runtime_api.h>
 #include <stdlib.h>
-inline const char *cusparseErrorCheck(cusparseStatus_t error)
+static inline const char *cusparseErrorCheck(cusparseStatus_t error)
 {
     switch (error)
     {
@@ -78,7 +78,7 @@ inline const char *cusparseErrorCheck(cusparseStatus_t error)
     }
     
 }
-inline const char *cublasErrorCheck(cublasStatus_t error)
+static inline const char *cublasErrorCheck(cublasStatus_t error)
 {
     switch (error)
     {
@@ -126,7 +126,7 @@ inline const char *cublasErrorCheck(cublasStatus_t error)
 //   }
 //}
 #define cusparseErrchk(ans) { cusparseAssert((ans), __FILE__, __LINE__); }
-inline void cusparseAssert(cusparseStatus_t code, const char *file, int line)
+static inline void cusparseAssert(cusparseStatus_t code, const char *file, int line)
 {
    if (code != CUSPARSE_STATUS_SUCCESS) 
    {
@@ -135,7 +135,7 @@ inline void cusparseAssert(cusparseStatus_t code, const char *file, int line)
    }
 }
 #define cublasErrchk(ans){ cublasAssert((ans), __FILE__, __LINE__); }
-inline void cublasAssert(cublasStatus_t code, const char *file, int line)
+static inline void cublasAssert(cublasStatus_t code, const char *file, int line)
 {
    if (code != CUBLAS_STATUS_SUCCESS) 
    {

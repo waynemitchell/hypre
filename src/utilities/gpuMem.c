@@ -79,10 +79,10 @@ void hypre_GPUInit(hypre_int use_device){
       HYPRE_DEVICE = use_device;
       gpuErrchk(cudaSetDevice(HYPRE_DEVICE));
     }
-      
+#ifdef USE_NVTX
       /* Create NVTX domain for all the nvtx calls in HYPRE */
       HYPRE_DOMAIN=nvtxDomainCreateA("Hypre");
-      
+#endif
       /* Initialize streams */
       hypre_int jj;
       for(jj=0;jj<MAX_HGS_ELEMENTS;jj++)
@@ -331,7 +331,7 @@ void printlist(node *head,hypre_int nc){
 
 cudaStream_t getstreamOlde(hypre_int i){
   static hypre_int firstcall=1;
-  const hypre_int MAXSTREAMS=10;
+#define MAXSTREAMS 10
   static cudaStream_t s[MAXSTREAMS];
   if (firstcall){
     hypre_int jj;
@@ -344,10 +344,10 @@ cudaStream_t getstreamOlde(hypre_int i){
   fprintf(stderr,"ERROR in HYPRE_STREAM in utilities/gpuMem.c %d is greater than MAXSTREAMS = %d\n Returning default stream",i,MAXSTREAMS);
   return 0;
 }
-
+#ifdef USE_NVTX
 nvtxDomainHandle_t getdomain(hypre_int i){
     static hypre_int firstcall=1;
-    const hypre_int MAXDOMAINS=1;
+#define MAXDOMAINS 1
     static nvtxDomainHandle_t h[MAXDOMAINS];
     if (firstcall){
       h[0]= nvtxDomainCreateA("HYPRE_A");
@@ -357,10 +357,10 @@ nvtxDomainHandle_t getdomain(hypre_int i){
     fprintf(stderr,"ERROR in getdomain in utilities/gpuMem.c %d  is greater than MAXDOMAINS = %d \n Returning default domain",i,MAXDOMAINS);
     return NULL;
   }
-
+#endif
 cudaEvent_t getevent(hypre_int i){
   static hypre_int firstcall=1;
-  const hypre_int MAXEVENTS=10;
+#define MAXEVENTS 10
   static cudaEvent_t s[MAXEVENTS];
   if (firstcall){
     hypre_int jj;

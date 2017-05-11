@@ -22,11 +22,14 @@ void VecCopy(double* tgt, const double* src, int size,cudaStream_t s);
 void VecSet(double* tgt, int size, double value, cudaStream_t s);
 void VecScale(double *u, double *v, double *l1_norm, int num_rows,cudaStream_t s);
 void VecScaleSplit(double *u, double *v, double *l1_norm, int num_rows,cudaStream_t s);
+void CSRDiagScale(HYPRE_Real *x_data, HYPRE_Real *y_data, HYPRE_Real *A_data, hypre_int *A_i, hypre_int local_size);
 void CudaCompileFlagCheck();
 #endif
 
 cudaStream_t getstreamOlde(hypre_int i);
+#ifdef USE_NVTX
 nvtxDomainHandle_t getdomain(hypre_int i);
+#endif
 cudaEvent_t getevent(hypre_int i);
 void MemAdviseReadOnly(const void *ptr, hypre_int device);
 void MemAdviseUnSetReadOnly(const void *ptr, hypre_int device);
@@ -72,7 +75,9 @@ struct hypre__global_struct{
   cusparseHandle_t cusparse_handle;
   cusparseMatDescr_t cusparse_mat_descr;
   cudaStream_t streams[MAX_HGS_ELEMENTS];
+#ifdef USE_NVTX
   nvtxDomainHandle_t nvtx_domain;
+#endif
   hypre_int concurrent_managed_access;
   size_t memoryHWM;
 };
@@ -89,7 +94,11 @@ extern struct hypre__global_struct hypre__global_handle ;
 #define HYPRE_DEVICE_COUNT hypre__global_handle.device_count
 #define HYPRE_CUSPARSE_MAT_DESCR hypre__global_handle.cusparse_mat_descr
 #define HYPRE_STREAM(index) (hypre__global_handle.streams[index])
+#ifdef USE_NVTX
 #define HYPRE_DOMAIN  hypre__global_handle.nvtx_domain
+#else
+#define HYPRE_DOMAIN 
+#endif
 #define HYPRE_GPU_CMA hypre__global_handle.concurrent_managed_access
 #define HYPRE_GPU_HWM hypre__global_handle.memoryHWM
 
