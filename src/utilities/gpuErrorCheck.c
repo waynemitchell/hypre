@@ -1,7 +1,7 @@
 
 #include "_hypre_utilities.h"
 
-#if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_SMS)
 #include <signal.h>
 #ifdef HYPRE_USE_GPU
 extern const char *cusparseErrorCheck(cusparseStatus_t error);
@@ -22,10 +22,10 @@ void cudaSafeFree(void *ptr,int padding)
   size_t *sptr=(size_t*)ptr-padding;
   cudaError_t err;
 
-  err=cudaPointerGetAttributes(&ptr_att,ptr);
+  err=cudaPointerGetAttributes(&ptr_att,sptr);
   if (err!=cudaSuccess){
     cudaGetLastError(); 
-#define FULL_WARN
+    //#define FULL_WARN
 #ifndef ABORT_ON_RAW_POINTER
 #ifdef FULL_WARN
     if (err==cudaErrorInvalidValue) fprintf(stderr,"WARNING :: Raw pointer passed to cudaSafeFree %p\n",ptr);
@@ -36,7 +36,11 @@ void cudaSafeFree(void *ptr,int padding)
     fprintf(stderr,"ERROR:: cudaSafeFree Aborting on raw unmanaged pointer %p\n",ptr);
     raise(SIGABRT);
 #endif
+#ifdef HYPRE_USE_SMS
+    free(sptr);
+#else
     free(ptr); /* Free the nonManaged pointer */
+#endif
     return;
   }
   if (ptr_att.isManaged){

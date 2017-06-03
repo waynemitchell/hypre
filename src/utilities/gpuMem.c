@@ -2,7 +2,7 @@
 #define _GNU_SOURCE
 #endif
 #include "_hypre_utilities.h"
-#if defined(HYPRE_USE_GPU) && defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_GPU) && ( defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_SMS))
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -509,5 +509,34 @@ hypre_int pointerIsManaged(const void *ptr){
     return 0;
   }
   return ptr_att.isManaged;
+}
+void makePointerManaged(void **ptr, size_t size)
+{
+  if (*ptr == NULL) return;
+  memoryType_t mem_type = queryPointer(*ptr);
+  if (mem_type == memoryTypeHost) {
+    char *buf;
+    gpuErrchk(cudaMallocManaged((void**)&buf, size+sizeof(size_t)*MEM_PAD_LEN, CUDAMEMATTACHTYPE));
+    size_t *sp=(size_t*)buf;
+    *sp=size;
+    buf=(void*)(&sp[MEM_PAD_LEN]);
+    memcpy(buf, *ptr, size);
+    free(*ptr);
+    *ptr = buf;
+  }    
+}
+void ReAllocManaged(void **ptr){
+  if (*ptr == NULL) return;
+  if (queryPointer(*ptr) == memoryTypeHost){
+    size_t size=memsize(*ptr);
+    char *buf;
+    gpuErrchk(cudaMallocManaged((void**)&buf, size+sizeof(size_t)*MEM_PAD_LEN, CUDAMEMATTACHTYPE));
+    size_t *sp=(size_t*)buf;
+    *sp=size;
+    buf=(void*)(&sp[MEM_PAD_LEN]);
+    memcpy(buf, *ptr, size);
+    hypre_Free(*ptr);
+    *ptr = buf;
+  }
 }
 #endif

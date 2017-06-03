@@ -10,7 +10,7 @@
  * $Revision$
  ***********************************************************************EHEADER*/
 
-#if defined(HYPRE_USE_GPU) && defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_GPU) && (defined(HYPRE_USE_MANAGED)||defined(HYPRE_USE_SMS))
 #ifndef __GPUMEM_H__
 #define  __GPUMEM_H__
 #ifdef HYPRE_USE_GPU
@@ -62,6 +62,8 @@ hypre_int getcore();
 hypre_int getnuma();
 hypre_int checkDeviceProps();
 hypre_int pointerIsManaged(const void *ptr);
+void makePointerManaged(void **ptr, size_t size);
+void ReAllocManaged(void **ptr);
 /*
  * Global struct for keeping HYPRE GPU Init state
  */

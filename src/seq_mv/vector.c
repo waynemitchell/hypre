@@ -256,6 +256,7 @@ hypre_SeqVectorSetConstantValues( hypre_Vector *v,
                                   HYPRE_Complex value )
 {
 #ifdef HYPRE_USE_GPU
+  hypre_SeqVectorPrefetchToDeviceInStream(v,4);
   VecSet(hypre_VectorData(v),hypre_VectorSize(v),value,HYPRE_STREAM(4));
   return 0;
 #endif
@@ -608,6 +609,9 @@ HYPRE_Real   hypre_SeqVectorInnerProdDevice( hypre_Vector *x,
   PUSH_RANGE_PAYLOAD("DEVDOT",4,hypre_VectorSize(x));
   static cublasHandle_t handle;
   static HYPRE_Int firstcall=1;
+  
+  hypre_SeqVectorPrefetchToDevice(x);
+  hypre_SeqVectorPrefetchToDevice(y);
 
   HYPRE_Complex *x_data = hypre_VectorData(x);
   HYPRE_Complex *y_data = hypre_VectorData(y);
@@ -621,6 +625,7 @@ HYPRE_Real   hypre_SeqVectorInnerProdDevice( hypre_Vector *x,
     handle = getCublasHandle();
     firstcall=0;
   }
+  /* Prefetched were commented out in the release version */
   PUSH_RANGE_PAYLOAD("DEVDOT-PRFETCH",5,hypre_VectorSize(x));
   //hypre_SeqVectorPrefetchToDevice(x);
   //hypre_SeqVectorPrefetchToDevice(y);
@@ -638,6 +643,7 @@ HYPRE_Real   hypre_SeqVectorInnerProdDevice( hypre_Vector *x,
 }
 void hypre_SeqVectorPrefetchToDevice(hypre_Vector *x){
   if (hypre_VectorSize(x)==0) return;
+  ReAllocManaged((void**)&hypre_VectorData(x));
   PUSH_RANGE("hypre_SeqVectorPrefetchToDevice",0);
   gpuErrchk(cudaMemPrefetchAsync(hypre_VectorData(x),hypre_VectorSize(x)*sizeof(HYPRE_Complex),HYPRE_DEVICE,HYPRE_STREAM(4)));
   gpuErrchk(cudaStreamSynchronize(HYPRE_STREAM(4)));
@@ -652,6 +658,7 @@ void hypre_SeqVectorPrefetchToHost(hypre_Vector *x){
 }
 void hypre_SeqVectorPrefetchToDeviceInStream(hypre_Vector *x, HYPRE_Int index){
   if (hypre_VectorSize(x)==0) return;
+  ReAllocManaged((void**)&hypre_VectorData(x));
   PUSH_RANGE("hypre_SeqVectorPrefetchToDevice",0);
   gpuErrchk(cudaMemPrefetchAsync(hypre_VectorData(x),hypre_VectorSize(x)*sizeof(HYPRE_Complex),HYPRE_DEVICE,HYPRE_STREAM(index)));
   gpuErrchk(cudaStreamSynchronize(HYPRE_STREAM(index)));

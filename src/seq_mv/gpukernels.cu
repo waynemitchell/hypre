@@ -37,6 +37,7 @@ extern "C"{
 extern "C"{
   void VecScale(HYPRE_Complex *u, HYPRE_Complex *v, HYPRE_Complex *l1_norm, hypre_int num_rows,cudaStream_t s){
     PUSH_RANGE_PAYLOAD("VECSCALE",1,num_rows);
+    fprintf(stderr,"VECSCALE\n");
     const hypre_int tpb=64;
     hypre_int num_blocks=num_rows/tpb+1;
 #ifdef CATCH_LAUNCH_ERRORS
@@ -83,6 +84,7 @@ extern "C"{
   void VecSet(HYPRE_Complex* tgt, hypre_int size, HYPRE_Complex value, cudaStream_t s){
     hypre_int tpb=64;
     //cudaDeviceSynchronize();
+    fprintf(stderr,"VECSET\n");
     MemPrefetchSized(tgt,size*sizeof(HYPRE_Complex),HYPRE_DEVICE,s);
     hypre_int num_blocks=size/tpb+1;
     VecSetKernel<<<num_blocks,tpb,0,s>>>(tgt,value,size);
@@ -100,6 +102,7 @@ extern "C"{
   }
   void PackOnDevice(HYPRE_Complex *send_data,HYPRE_Complex *x_local_data, hypre_int *send_map, hypre_int begin,hypre_int end,cudaStream_t s){
     if ((end-begin)<=0) return;
+    printf("PACK ON DEVICE \n");
     hypre_int tpb=64;
     hypre_int num_blocks=(end-begin)/tpb+1;
 #ifdef CATCH_LAUNCH_ERRORS

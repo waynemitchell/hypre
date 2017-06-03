@@ -677,7 +677,9 @@ HYPRE_Int hypre_CSRMatrixGetLoadBalancedPartitionEnd(hypre_CSRMatrix *A)
 #ifdef HYPRE_USE_GPU
 void hypre_CSRMatrixPrefetchToDevice(hypre_CSRMatrix *A){
   if (hypre_CSRMatrixNumNonzeros(A)==0) return;
-
+  ReAllocManaged((void**)&hypre_CSRMatrixData(A));
+  ReAllocManaged((void**)&hypre_CSRMatrixI(A));
+  ReAllocManaged((void**)&hypre_CSRMatrixJ(A));
   PUSH_RANGE_PAYLOAD("hypre_CSRMatrixPrefetchToDevice",0,hypre_CSRMatrixNumNonzeros(A));
   if ((!A->on_device)&&(hypre_CSRMatrixNumNonzeros(A)>8192)){
     gpuErrchk(cudaMemPrefetchAsync(hypre_CSRMatrixData(A),hypre_CSRMatrixNumNonzeros(A)*sizeof(HYPRE_Complex),HYPRE_DEVICE,HYPRE_STREAM(4)));

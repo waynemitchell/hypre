@@ -9,8 +9,8 @@
  *
  * $Revision$
  ***********************************************************************EHEADER*/
-
-#ifdef HYPRE_USE_MANAGED
+#include <signal.h>
+#if defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_SMS)
 #include <cuda_runtime_api.h>
 #define CUDAMEMATTACHTYPE cudaMemAttachGlobal
 #define MEM_PAD_LEN 1
@@ -21,9 +21,50 @@ static inline void gpuAssert(cudaError_t code, const char *file, int line)
    {
      fprintf(stderr,"CUDA ERROR ( Code = %d) in line %d of file %s\n",code,line,file);
      fprintf(stderr,"CUDA ERROR : %s \n", cudaGetErrorString(code));
+     raise(SIGABRT);
      exit(2);
    }
 }
+
+typedef enum memoryType {memoryTypeHost = 0, 
+                 memoryTypeDevice = 1, 
+                 memoryTypeHostPinned = 2, 
+			 memoryTypeManaged = 3} memoryType_t;
+/* typedef enum memoryType memoryType_t; */
+inline memoryType_t queryPointer(const void *ptr)
+{
+  CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_CONTEXT,
+                                CU_POINTER_ATTRIBUTE_MEMORY_TYPE,
+                                CU_POINTER_ATTRIBUTE_IS_MANAGED};
+  CUcontext context = NULL;
+  CUmemorytype mem_type;
+  int is_managed = 0;
+  void* data[] = {&context, &mem_type, &is_managed};
+
+  CUresult err = cuPointerGetAttributes(3, attr, data, (CUdeviceptr)ptr);
+  if (err != CUDA_SUCCESS) {
+    printf("queryPointer error: %d\n", err);
+    exit(1);
+  }
+
+  memoryType_t type;
+
+  if (context == NULL) {
+    type = memoryTypeHost;
+  } else {
+    if (mem_type == CU_MEMORYTYPE_DEVICE) {
+      if (is_managed)
+        type = memoryTypeManaged;
+      else
+        type = memoryTypeDevice;
+    } else {
+      type = memoryTypeHostPinned;
+    }
+  }
+
+  return type;
+}
+
 #define HYPRE_HOST_POINTER 0
 #define HYPRE_MANAGED_POINTER 1
 #define HYPRE_PINNED_POINTER 2
@@ -35,7 +76,7 @@ hypre_int PrintPointerAttributes(const void *ptr);
 hypre_int PointerAttributes(const void *ptr);
 #endif
 
-#if defined(HYPRE_USE_GPU) && defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_GPU) && (defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_SMS))
 #ifndef __cusparseErrorCheck__
 #define __cusparseErrorCheck__
 #include <cusparse.h>

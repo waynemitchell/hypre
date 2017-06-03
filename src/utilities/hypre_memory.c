@@ -18,9 +18,6 @@
 
 #define HYPRE_USE_MANAGED_SCALABLE 1
 #include "_hypre_utilities.h"
-//#include "gpgpu.h"
-//#include "hypre_nvtx.h"
-//#include "gpuMem.h"
 #ifdef HYPRE_USE_UMALLOC
 #undef HYPRE_USE_UMALLOC
 #endif
@@ -74,7 +71,14 @@ hypre_MAlloc( size_t size )
       mempush(ptr,size,0);
 #endif
 #else
+#ifdef HYPRE_USE_SMS
+      ptr = malloc(size+sizeof(size_t)*MEM_PAD_LEN);
+      size_t *sp=(size_t*)ptr;
+      *sp=size;
+      ptr=(void*)(&sp[MEM_PAD_LEN]);
+#else
       ptr = malloc(size);
+#endif
 #endif
 
 #if 1
@@ -124,7 +128,12 @@ hypre_CAlloc( size_t count,
       mempush(ptr,size,0);
 #endif
 #else
+#ifdef HYPRE_USE_SMS
+      ptr=(void*)hypre_MAlloc(size);
+      memset(ptr,0,count*elt_size);
+#else
       ptr = calloc(count, elt_size);
+#endif
 #endif
 
 #if 1
@@ -143,7 +152,7 @@ hypre_CAlloc( size_t count,
    return(char*) ptr;
 }
 
-#ifdef HYPRE_USE_MANAGED
+#if defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_SMS)
 size_t memsize(const void *ptr){
 return ((size_t*)ptr)[-MEM_PAD_LEN];
 }
@@ -199,11 +208,38 @@ hypre_ReAlloc( char   *ptr,
 #else
    if (ptr == NULL)
    {
-	   ptr = (char*)malloc(size);
+#ifdef HYPRE_USE_SMS
+     ptr = hypre_MAlloc(size);
+#else
+     ptr = (char*)malloc(size);
+#endif
    }
    else
-   {
+     {
+#ifdef HYPRE_USE_SMS
+       if (queryPointer(ptr)==memoryTypeHost){
+       size_t *sptr=(size_t*)ptr-MEM_PAD_LEN;
+       ptr = (char*)realloc(sptr, size+sizeof(size_t)*MEM_PAD_LEN);
+       size_t *sp=(size_t*)ptr;
+       *sp=size;
+       ptr=(void*)(&sp[MEM_PAD_LEN]);
+     } else { /* assumes that it is a managed pointer if it is not a host pointer for now */
+     void *nptr;
+     gpuErrchk( cudaMallocManaged(&nptr,size+sizeof(size_t)*MEM_PAD_LEN,CUDAMEMATTACHTYPE) );
+     size_t old_size=memsize((void*)ptr);
+     size_t *sp=(size_t*)ptr;
+     *sp=size;
+     nptr=(void*)(&sp[MEM_PAD_LEN]);
+     if (size>old_size)
+       memcpy(nptr,ptr,old_size); /* This should be done on the device */
+     else
+       memcpy(nptr,ptr,size); /* This should be done on the device */
+     hypre_Free(ptr);
+     ptr=(char*) nptr;
+   }
+#else
 	   ptr = (char*)realloc(ptr, size);
+#endif
    }
 #endif
 
@@ -241,7 +277,11 @@ hypre_Free( char *ptr )
 #endif
       //gpuErrchk(cudaFree((void*)ptr));
 #else
+#ifdef HYPRE_USE_SMS
+      cudaSafeFree(ptr,MEM_PAD_LEN);
+#else
       free(ptr);
+#endif
 #endif
    }
 }
