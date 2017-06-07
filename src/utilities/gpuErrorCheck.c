@@ -17,6 +17,56 @@ extern void cusparseAssert(cusparseStatus_t code, const char *file, int line);
  */
 void cudaSafeFree(void *ptr,int padding)
 {
+  if (padding!=1) {
+    fprintf(stderr,"ERROR :: incorrect padding\n");
+    raise(SIGABRT);
+  }
+  PUSH_RANGE("SAFE_FREE",3);
+  size_t *sptr=(size_t*)ptr-padding;
+  
+  memoryType_t mtype = queryPointer(sptr);
+  if (mtype==memoryTypeHost){
+    
+    //#define FULL_WARN
+#ifndef ABORT_ON_RAW_POINTER
+#ifdef FULL_WARN
+    fprintf(stderr,"WARNING :: Raw pointer passed to cudaSafeFree %p\n",ptr);
+    
+    //PrintPointerAttributes(ptr);
+#endif
+#else
+    fprintf(stderr,"ERROR:: cudaSafeFree Aborting on raw unmanaged pointer %p\n",ptr);
+    raise(SIGABRT);
+#endif
+#ifdef HYPRE_USE_SMS
+    free(sptr);
+#else
+    free(ptr); /* Free the nonManaged pointer */
+#endif
+  } else if (mtype==memoryTypeManaged){
+#if defined(HYPRE_USE_GPU) && defined(HYPRE_MEASURE_GPU_HWM)
+    size_t mfree,mtotal;
+    gpuErrchk(cudaMemGetInfo(&mfree,&mtotal));
+    HYPRE_GPU_HWM=hypre_max((mtotal-mfree),HYPRE_GPU_HWM);
+#endif
+    /* Code below for handling managed memory pointers not allocated using hypre_CTAlloc oir hypre_TAlooc */
+    if (queryPointer(ptr)!=queryPointer(sptr)){
+    //fprintf(stderr,"ERROR IN Pointer for freeing %p %p\n",ptr,sptr);
+    gpuErrchk(cudaFree(ptr)); 
+    return;
+  }
+    gpuErrchk(cudaFree(sptr)); 
+  } else if (mtype==memoryTypeHostPinned){
+    /* It is a pinned memory pointer */
+    gpuErrchk(cudaFreeHost(sptr));
+  } else if (mtype==memoryTypeDevice){
+    gpuErrchk(cudaFree(sptr)); 
+  }
+    POP_RANGE;
+    return;
+  }
+void cudaSafeFreeOld(void *ptr,int padding)
+{
   PUSH_RANGE("SAFE_FREE",3);
   struct cudaPointerAttributes ptr_att;
   size_t *sptr=(size_t*)ptr-padding;

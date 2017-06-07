@@ -504,6 +504,9 @@ hypre_int checkDeviceProps(){
   return HYPRE_GPU_CMA;
 }
 hypre_int pointerIsManaged(const void *ptr){
+  if (queryPointer(ptr) == memoryTypeHost) return 0;
+  return 1;
+  
   struct cudaPointerAttributes ptr_att;
   if (cudaPointerGetAttributes(&ptr_att,ptr)!=cudaSuccess) {
     return 0;
@@ -527,9 +530,11 @@ void makePointerManaged(void **ptr, size_t size)
 }
 void ReAllocManaged(void **ptr){
   if (*ptr == NULL) return;
-  if (queryPointer(*ptr) == memoryTypeHost){
+  memoryType_t mtype = queryPointer(*ptr);
+  if (mtype == memoryTypeHost){
     size_t size=memsize(*ptr);
-    char *buf;
+    char *buf=NULL;
+    //printf("ReAllocManaged swithcing %p to managed for size %zu\n",*ptr,size+sizeof(size_t)*MEM_PAD_LEN);
     gpuErrchk(cudaMallocManaged((void**)&buf, size+sizeof(size_t)*MEM_PAD_LEN, CUDAMEMATTACHTYPE));
     size_t *sp=(size_t*)buf;
     *sp=size;
@@ -537,6 +542,7 @@ void ReAllocManaged(void **ptr){
     memcpy(buf, *ptr, size);
     hypre_Free(*ptr);
     *ptr = buf;
-  }
+  } else if (mtype == memoryTypeDevice) fprintf(stderr,"ERROR:: Switch from device space not supported \n");
+  else if (mtype== memoryTypeHostPinned) fprintf(stderr,"ERROR:: Switch from MANAGED space not supported \n");
 }
 #endif

@@ -15,6 +15,7 @@
 #define CUDAMEMATTACHTYPE cudaMemAttachGlobal
 #define MEM_PAD_LEN 1
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+
 static inline void gpuAssert(cudaError_t code, const char *file, int line)
 {
    if (code != cudaSuccess) 
@@ -31,7 +32,7 @@ typedef enum memoryType {memoryTypeHost = 0,
                  memoryTypeHostPinned = 2, 
 			 memoryTypeManaged = 3} memoryType_t;
 /* typedef enum memoryType memoryType_t; */
-inline memoryType_t queryPointer(const void *ptr)
+static inline memoryType_t queryPointer(const void *ptr)
 {
   CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_CONTEXT,
                                 CU_POINTER_ATTRIBUTE_MEMORY_TYPE,
@@ -189,6 +190,15 @@ void cudaSafeFree(void *ptr,int padding);
 //void PrintPointerAttributes(const void *ptr);
 //size_t mempush(void* ptr, size_t size,int purge);
 //int memloc(void *ptr, int device);
+#define ptrChk(ans) { chkMemType((ans), __FILE__, __LINE__); }
+static inline void chkMemType(void *ptr, const char *file, int line){
+  memoryType_t mtype;
+  mtype = queryPointer(ptr);
+  if (mtype==memoryTypeHost) printf("%p on line %d of file %s is a Host pointer \n",ptr,line,file);
+  else if (mtype==memoryTypeDevice) printf("%p on line %d of file %s is a Device pointer \n",ptr,line,file);
+  else if (mtype==memoryTypeManaged) printf("%p on line %d of file %s is a Managed pointer \n",ptr,line,file);
+  else if (mtype==memoryTypeHostPinned) printf("%p on line %d of file %s is a PINNED Host pointer \n",ptr,line,file);
+}
 #endif
 #endif
 

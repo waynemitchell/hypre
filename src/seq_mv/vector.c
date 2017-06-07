@@ -325,6 +325,8 @@ hypre_SeqVectorCopy( hypre_Vector *x,
                      hypre_Vector *y )
 {
 #ifdef HYPRE_USE_GPU
+  hypre_SeqVectorPrefetchToDevice(x);
+  hypre_SeqVectorPrefetchToDevice(y);
   return hypre_SeqVectorCopyDevice(x,y);
 #endif
 #ifdef HYPRE_PROFILE
@@ -413,6 +415,7 @@ hypre_SeqVectorScale( HYPRE_Complex alpha,
 #endif
    
 #ifdef HYPRE_USE_GPU
+   hypre_SeqVectorPrefetchToDevice(y);
    return VecScaleScalar(y->data,alpha, hypre_VectorSize(y),HYPRE_STREAM(4));
 #endif
    HYPRE_Complex *y_data = hypre_VectorData(y);
@@ -553,7 +556,8 @@ HYPRE_Int
 hypre_SeqVectorCopyDevice( hypre_Vector *x,
                      hypre_Vector *y )
 {
-  
+  hypre_SeqVectorPrefetchToDevice(x);
+  hypre_SeqVectorPrefetchToDevice(y);
   HYPRE_Complex *x_data = hypre_VectorData(x);
   HYPRE_Complex *y_data = hypre_VectorData(y);
   HYPRE_Int      size   = hypre_VectorSize(x);
@@ -566,8 +570,8 @@ hypre_SeqVectorCopyDevice( hypre_Vector *x,
   if (size > size_y) size = size_y;
   size *=hypre_VectorNumVectors(x);
   PUSH_RANGE_PAYLOAD("VECCOPYDEVICE",2,size);
-  hypre_SeqVectorPrefetchToDevice(x);
-  hypre_SeqVectorPrefetchToDevice(y);
+  
+  //fprintf(stderr,"SeqVectorCopy %d \n",size);
   VecCopy(y_data,x_data,size,HYPRE_STREAM(4));
   cudaStreamSynchronize(HYPRE_STREAM(4));
   POP_RANGE;
@@ -645,8 +649,13 @@ void hypre_SeqVectorPrefetchToDevice(hypre_Vector *x){
   if (hypre_VectorSize(x)==0) return;
   ReAllocManaged((void**)&hypre_VectorData(x));
   PUSH_RANGE("hypre_SeqVectorPrefetchToDevice",0);
-  gpuErrchk(cudaMemPrefetchAsync(hypre_VectorData(x),hypre_VectorSize(x)*sizeof(HYPRE_Complex),HYPRE_DEVICE,HYPRE_STREAM(4)));
-  gpuErrchk(cudaStreamSynchronize(HYPRE_STREAM(4)));
+  if (queryPointer(hypre_VectorData(x))!=memoryTypeManaged) {
+    fprintf(stderr,"ERROR :: Prefetching unmanaged memory\n");
+    raise(SIGABRT);
+  } else{
+    gpuErrchk(cudaMemPrefetchAsync(hypre_VectorData(x),hypre_VectorSize(x)*sizeof(HYPRE_Complex),HYPRE_DEVICE,HYPRE_STREAM(4)));
+    gpuErrchk(cudaStreamSynchronize(HYPRE_STREAM(4)));
+  }
   POP_RANGE;
 }
 void hypre_SeqVectorPrefetchToHost(hypre_Vector *x){

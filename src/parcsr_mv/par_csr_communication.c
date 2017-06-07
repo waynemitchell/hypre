@@ -71,11 +71,22 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
       case HYPRE_COMM_PKG_JOB_COMPLEX:
          if (!send_data)
          {
-            send_data = hypre_PinnedTAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
+#ifdef HYPRE_USE_SMS
+	   //send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
+	   //ReAllocManaged((void**)&send_data); // This should be a device buffer
+	   send_data=hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
+#else
+	   send_data = hypre_PinnedTAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
+#endif
+
          }
          if (!recv_data)
          {
-            recv_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
+#ifdef HYPRE_USE_SMS
+	   recv_data=hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));
+#else
+	   recv_data = hypre_CTAlloc(HYPRE_Complex, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
+#endif
          }
          for (i = 0; i < num_recvs; ++i)
          {
@@ -99,11 +110,20 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
       case HYPRE_COMM_PKG_JOB_COMPLEX_TRANSPOSE:
          if (!recv_data)
          {
+	   //fprintf(stderr,"HYPRE_COMM_PKG_JOB_COMPLEX_TRANSPOSE:\n"); raise(SIGABRT);
+#ifdef HYPRE_USE_SMS
+	   recv_data = hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
+#else
             recv_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
+#endif
          }
          if (!send_data)
          {
+#ifdef HYPRE_USE_SMS
+	   send_data = hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));
+#else
             send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
+#endif
          }
          for (i = 0; i < num_sends; ++i)
          {
@@ -127,11 +147,19 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
       case HYPRE_COMM_PKG_JOB_INT:
          if (!send_data)
          {
+#ifdef HYPRE_USE_SMS
+	   send_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends)); 
+#else
             send_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
+#endif
          }
          if (!recv_data)
          {
+#ifdef HYPRE_USE_SMS
+	   recv_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs)); 
+#else
             recv_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
+#endif
          }
          for (i = 0; i < num_recvs; ++i)
          {
@@ -155,11 +183,19 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
       case HYPRE_COMM_PKG_JOB_INT_TRANSPOSE:
          if (!recv_data)
          {
-            recv_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
+#ifdef HYPRE_USE_SMS
+	    recv_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
+#else
+            recv_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends)); 
+#endif 
          }
          if (!send_data)
          {
+#ifdef HYPRE_USE_SMS
+	    send_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
+#else
             send_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
+#endif
          }
          for (i = 0; i < num_sends; ++i)
          {

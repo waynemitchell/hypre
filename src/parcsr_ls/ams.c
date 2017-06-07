@@ -70,16 +70,21 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 	 HYPRE_Int i, num_rows = hypre_ParCSRMatrixNumRows(A);
 #ifdef HYPRE_USE_GPU
 	 if (sweep==0){
+	   hypre_SeqVectorPrefetchToDevice(hypre_ParVectorLocalVector(u));
 	   hypre_SeqVectorPrefetchToDevice(hypre_ParVectorLocalVector(v));
 	   hypre_SeqVectorPrefetchToDevice(hypre_ParVectorLocalVector(f));
 	 }
+	 f_data = hypre_VectorData(hypre_ParVectorLocalVector(f));
+	 v_data = hypre_VectorData(hypre_ParVectorLocalVector(v));
+	 u_data = hypre_VectorData(hypre_ParVectorLocalVector(u));
+	 //fprintf(stderr,"ams.c size is %d \n ",hypre_VectorSize(hypre_ParVectorLocalVector(v)));
 	 VecCopy(v_data,f_data,hypre_VectorSize(hypre_ParVectorLocalVector(v)),HYPRE_STREAM(4));
 #else
          hypre_ParVectorCopy(f,v);
 #endif
          hypre_ParCSRMatrixMatvec(-relax_weight, A, u, relax_weight, v);
 #ifdef HYPRE_USE_GPU
-	 
+	 //ptrChk(l1_norms);
 	 VecScale(u_data,v_data,l1_norms,num_rows,HYPRE_STREAM(4));
 #else
          /* u += w D^{-1}(f - A u), where D_ii = ||A(i,:)||_1 */
@@ -571,7 +576,8 @@ HYPRE_Int hypre_ParCSRComputeL1Norms(hypre_ParCSRMatrix *A,
 
    HYPRE_Real diag;
    HYPRE_Real *l1_norm = hypre_TAlloc(HYPRE_Real, num_rows);
-
+   ReAllocManaged((void**)&l1_norm); /* Should this be a straight managed memory alloc. another one in threads */
+	 
    HYPRE_Int *cf_marker_offd = NULL;
    HYPRE_Int cf_diag;
 
@@ -3321,6 +3327,7 @@ HYPRE_Int hypre_ParCSRComputeL1NormsThreads(hypre_ParCSRMatrix *A,
 
    HYPRE_Real diag;
    HYPRE_Real *l1_norm = hypre_CTAlloc(HYPRE_Real, num_rows);
+   ReAllocManaged((void**)&l1_norm); /* Should this be a straight managed memory alloc. another one in threads */
    HYPRE_Int ii, ns, ne, rest, size;
 
    HYPRE_Int *cf_marker_offd = NULL;

@@ -37,13 +37,16 @@ extern "C"{
 extern "C"{
   void VecScale(HYPRE_Complex *u, HYPRE_Complex *v, HYPRE_Complex *l1_norm, hypre_int num_rows,cudaStream_t s){
     PUSH_RANGE_PAYLOAD("VECSCALE",1,num_rows);
-    fprintf(stderr,"VECSCALE\n");
+    //fprintf(stderr,"VECSCALE\n");
     const hypre_int tpb=64;
     hypre_int num_blocks=num_rows/tpb+1;
 #ifdef CATCH_LAUNCH_ERRORS
     gpuErrchk2(cudaPeekAtLastError());
     gpuErrchk2(cudaDeviceSynchronize());
 #endif
+    //ptrChk(u);
+    //ptrChk(v);
+    //ptrChk(l1_norm);
     MemPrefetchSized(l1_norm,num_rows*sizeof(HYPRE_Complex),HYPRE_DEVICE,s);
     VecScaleKernel<<<num_blocks,tpb,0,s>>>(u,v,l1_norm,num_rows);
 #ifdef CATCH_LAUNCH_ERRORS    
@@ -66,10 +69,21 @@ extern "C"{
   void VecCopy(HYPRE_Complex* tgt, const HYPRE_Complex* src, hypre_int size,cudaStream_t s){
     hypre_int tpb=64;
     hypre_int num_blocks=size/tpb+1;
+    //ptrChk((void*)tgt);
+    //ptrChk((void*)src);
     PUSH_RANGE_PAYLOAD("VecCopy",5,size);
+    //fprintf(stderr,"VecCopy %d %d\n",size,num_blocks);
     //MemPrefetch(tgt,0,s);
     //MemPrefetch(src,0,s);
+#ifdef CATCH_LAUNCH_ERRORS
+    gpuErrchk2(cudaPeekAtLastError());
+    gpuErrchk2(cudaDeviceSynchronize());
+#endif
     VecCopyKernel<<<num_blocks,tpb,0,s>>>(tgt,src,size);
+#ifdef CATCH_LAUNCH_ERRORS    
+    gpuErrchk2(cudaPeekAtLastError());
+    gpuErrchk2(cudaDeviceSynchronize());
+#endif
     //gpuErrchk2(cudaStreamSynchronize(s));
     POP_RANGE;
   }
@@ -84,7 +98,7 @@ extern "C"{
   void VecSet(HYPRE_Complex* tgt, hypre_int size, HYPRE_Complex value, cudaStream_t s){
     hypre_int tpb=64;
     //cudaDeviceSynchronize();
-    fprintf(stderr,"VECSET\n");
+    //fprintf(stderr,"VECSET\n");
     MemPrefetchSized(tgt,size*sizeof(HYPRE_Complex),HYPRE_DEVICE,s);
     hypre_int num_blocks=size/tpb+1;
     VecSetKernel<<<num_blocks,tpb,0,s>>>(tgt,value,size);
@@ -102,7 +116,11 @@ extern "C"{
   }
   void PackOnDevice(HYPRE_Complex *send_data,HYPRE_Complex *x_local_data, hypre_int *send_map, hypre_int begin,hypre_int end,cudaStream_t s){
     if ((end-begin)<=0) return;
-    printf("PACK ON DEVICE \n");
+    //printf("PACK ON DEVICE \n");
+    //ptrChk(send_data);
+    //ptrChk(x_local_data);
+    //ptrChk(send_map);
+    
     hypre_int tpb=64;
     hypre_int num_blocks=(end-begin)/tpb+1;
 #ifdef CATCH_LAUNCH_ERRORS
@@ -169,6 +187,11 @@ void CSRDiagScaleKernel(HYPRE_Real *x_data, HYPRE_Real *y_data, HYPRE_Real *A_da
   void CSRDiagScale(HYPRE_Real *x_data, HYPRE_Real *y_data, HYPRE_Real *A_data, hypre_int *A_i, hypre_int local_size){
     hypre_int num_threads=1024;
     hypre_int num_blocks=local_size/num_threads+1;
+    ptrChk(x_data);
+    ptrChk(y_data);
+    ptrChk(A_data);
+    ptrChk(A_i);
+    
     CSRDiagScaleKernel<<<num_blocks,num_threads,0,HYPRE_STREAM(4)>>>(x_data,y_data,A_data,A_i,local_size);
     gpuErrchk2(cudaStreamSynchronize(HYPRE_STREAM(4)));
   }

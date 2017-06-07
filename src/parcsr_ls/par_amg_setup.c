@@ -2189,7 +2189,6 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
 	grid_relax_type[1] == 18 || grid_relax_type[2] == 18 || grid_relax_type[3] == 18)
    {
       l1_norms = hypre_CTAlloc(HYPRE_Real *, num_levels);
-      ReAllocManaged((void**)&l1_norms); /* SHould be straight managed memory alloc */
       hypre_ParAMGDataL1Norms(amg_data) = l1_norms;
    }
    if (grid_relax_type[0] == 16 ||grid_relax_type[1] == 16 || grid_relax_type[2] == 16 || grid_relax_type[3] == 16)

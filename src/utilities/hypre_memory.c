@@ -318,7 +318,7 @@ hypre_MAllocPinned( size_t size )
       mempush(ptr,size,0);
 #endif
 #else
-      ptr = malloc(size);
+      ptr = hypre_MAlloc(size);
 #endif
 
 #if 1
@@ -347,7 +347,14 @@ hypre_MAllocHost( size_t size )
 
    if (size > 0)
    {
+#ifdef HYPRE_USE_SMS
+     ptr = malloc(size+sizeof(size_t)*MEM_PAD_LEN);
+     size_t *sp=(size_t*)ptr;
+     *sp=size;
+     ptr=(void*)(&sp[MEM_PAD_LEN]);
+#else
      ptr = malloc(size);
+#endif
 #if 1
       if (ptr == NULL)
       {
@@ -451,4 +458,17 @@ hypre_FreeHost( char *ptr )
       free(ptr);
 #endif
    }
+}
+char *hypre_MallocManaged( size_t size )
+{
+   void *ptr=NULL;
+
+   if (size > 0){
+     gpuErrchk( cudaMallocManaged(&ptr,size+sizeof(size_t)*MEM_PAD_LEN,CUDAMEMATTACHTYPE) );
+     size_t *sp=(size_t*)ptr;
+     *sp=size;
+     ptr=(void*)(&sp[MEM_PAD_LEN]);
+ 
+   }
+   return (char*)ptr;
 }

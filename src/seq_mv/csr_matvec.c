@@ -795,10 +795,15 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
   if (b!=y){
 
     PUSH_RANGE_PAYLOAD("MEMCPY",1,y->size-offset);
+    hypre_SeqVectorPrefetchToDevice(y);
+    hypre_SeqVectorPrefetchToDevice(b);
+    //   fprintf(stderr,"VecCopy ins CSR_amtrix %d\n",(y->size-offset));
     VecCopy(y->data,b->data,(y->size-offset),HYPRE_STREAM(4));
-    POP_RANGE
+    
+  } else {
+    hypre_SeqVectorPrefetchToDevice(y);
   }
-
+    
   if (x==y) fprintf(stderr,"ERROR::x and y are the same pointer in hypre_CSRMatrixMatvecDevice\n");
 
   if (FirstCall){
@@ -829,7 +834,7 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
 
   hypre_CSRMatrixPrefetchToDevice(A);
   hypre_SeqVectorPrefetchToDevice(x);
-  hypre_SeqVectorPrefetchToDevice(y);
+  
   
   if (offset!=0) printf("WARNING:: Offset is not zero in hypre_CSRMatrixMatvecDevice :: %d \n",offset);
   cusparseErrchk(cusparseDcsrmv(handle ,

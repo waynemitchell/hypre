@@ -60,6 +60,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
    HYPRE_Int          idxstride = hypre_VectorIndexStride( x_local );
 
    HYPRE_Complex     *x_tmp_data, **x_buf_data;
+   ReAllocManaged((void**)&hypre_VectorData(x_local));
    HYPRE_Complex     *x_local_data = hypre_VectorData(x_local);
 
    /*---------------------------------------------------------------------
@@ -155,6 +156,11 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #ifdef HYPRE_USE_GPU
       PUSH_RANGE("PERCOMM2DEVICE",4);
 #ifdef HYPRE_USING_PERSISTENT_COMM
+      //fprintf(stderr,"REALLOC IN PAR CS MATVEC\n");
+      ReAllocManaged((void**)&hypre_ParCSRCommPkgSendMapElmts(comm_pkg));
+      //ReAllocManaged((void**)&hypre_VectorData(x_local));
+
+      //fprintf(stderr,"DONe WITH REALLOC IN PAR CS MATVEC\n");
       PackOnDevice((HYPRE_Complex*)persistent_comm_handle->send_data,x_local_data,hypre_ParCSRCommPkgSendMapElmts(comm_pkg),begin,end,HYPRE_STREAM(4));
       //PrintPointerAttributes(persistent_comm_handle->send_data);
 #else

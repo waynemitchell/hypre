@@ -267,6 +267,7 @@ HYPRE_Int hypre_OutOfMemory ( size_t size );
 char *hypre_MAlloc ( size_t size );
 char *hypre_CAlloc ( size_t count , size_t elt_size );
 char *hypre_MAllocPinned( size_t size );
+char *hypre_MallocManaged( size_t size );
 char *hypre_ReAlloc ( char *ptr , size_t size );
 void hypre_Free ( char *ptr );
 char *hypre_CAllocHost( size_t count,size_t elt_size );
