@@ -78,7 +78,7 @@ hypre_SeqVectorDestroy( hypre_Vector *vector )
       {
          hypre_TFree(hypre_VectorData(vector));
       }
-      hypre_HostTFree(vector);
+      hypre_TFree(vector);
    }
 
    return ierr;
@@ -96,8 +96,10 @@ hypre_SeqVectorInitialize( hypre_Vector *vector )
    HYPRE_Int  num_vectors = hypre_VectorNumVectors(vector);
    HYPRE_Int  multivec_storage_method = hypre_VectorMultiVecStorageMethod(vector);
 
-   if ( ! hypre_VectorData(vector) )
+   if ( ! hypre_VectorData(vector) ){
       hypre_VectorData(vector) = hypre_CTAlloc(HYPRE_Complex, num_vectors*size);
+      //if ((sizeof(HYPRE_Complex)*num_vectors*size)==968){ printf("HERE I AM %p\n",vector->data); raise(SIGABRT); raise(SIGABRT);}
+   }
 
    if ( multivec_storage_method == 0 )
    {
@@ -256,7 +258,11 @@ hypre_SeqVectorSetConstantValues( hypre_Vector *v,
                                   HYPRE_Complex value )
 {
 #ifdef HYPRE_USE_GPU
+  ptrChk(hypre_VectorData(v));
+  printf("Size check %zu %d\n",memsize(hypre_VectorData(v)),hypre_VectorSize(v)*8);
   hypre_SeqVectorPrefetchToDeviceInStream(v,4);
+  printf("Post Size check %zu %d\n",memsize(hypre_VectorData(v)),hypre_VectorSize(v)*8);
+  ptrChk(hypre_VectorData(v));
   VecSet(hypre_VectorData(v),hypre_VectorSize(v),value,HYPRE_STREAM(4));
   return 0;
 #endif
@@ -647,9 +653,11 @@ HYPRE_Real   hypre_SeqVectorInnerProdDevice( hypre_Vector *x,
 }
 void hypre_SeqVectorPrefetchToDevice(hypre_Vector *x){
   if (hypre_VectorSize(x)==0) return;
-  ReAllocManaged((void**)&hypre_VectorData(x));
+  //printf("PreRealloc in Vector Prefetch size = %d\n",x->size*sizeof(HYPRE_Complex));
+  //ReAllocManagedDebug((void**)&(x->data),x->size*sizeof(HYPRE_Complex)); // COde runs with this
+  ReAllocManaged((void**)&(x->data)); // COde segfaults with this
   PUSH_RANGE("hypre_SeqVectorPrefetchToDevice",0);
-  if (queryPointer(hypre_VectorData(x))!=memoryTypeManaged) {
+  if (queryPointerOffset(hypre_VectorData(x))!=memoryTypeManaged) {
     fprintf(stderr,"ERROR :: Prefetching unmanaged memory\n");
     raise(SIGABRT);
   } else{
@@ -660,6 +668,7 @@ void hypre_SeqVectorPrefetchToDevice(hypre_Vector *x){
 }
 void hypre_SeqVectorPrefetchToHost(hypre_Vector *x){
   if (hypre_VectorSize(x)==0) return;
+  if (queryPointerOffset(hypre_VectorData(x))!=memoryTypeManaged) return;
   PUSH_RANGE("hypre_SeqVectorPrefetchToHost",0);
   gpuErrchk(cudaMemPrefetchAsync(hypre_VectorData(x),hypre_VectorSize(x)*sizeof(HYPRE_Complex),cudaCpuDeviceId,HYPRE_STREAM(4)));
   gpuErrchk(cudaStreamSynchronize(HYPRE_STREAM(4)));

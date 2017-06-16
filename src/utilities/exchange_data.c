@@ -460,7 +460,7 @@ HYPRE_Int hypre_DataExchangeList(HYPRE_Int num_contacts,
       hypre_TFree(recv_contact_buf);
    }
   
-   hypre_Free((char*)send_response_buf);
+   hypre_TFree(send_response_buf);
    hypre_TFree(contact_ptrs);
    hypre_TFree(response_ptrs);
 
@@ -529,7 +529,7 @@ HYPRE_Int hypre_DataExchangeList(HYPRE_Int num_contacts,
 
    /*--------------CLEAN UP------------------- */
   
-   hypre_Free((char*)initial_recv_buf);
+   hypre_TFree(initial_recv_buf);
 
    if (num_contacts > 0 ) 
    {
@@ -561,7 +561,7 @@ HYPRE_Int hypre_DataExchangeList(HYPRE_Int num_contacts,
  
       for (i=0; i< post_array_size; i++)
       {
-		  hypre_Free((char*)post_array[i]);
+		  hypre_TFree(post_array[i]);
       }
       hypre_TFree(post_array);
    }

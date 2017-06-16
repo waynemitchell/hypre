@@ -93,7 +93,7 @@ hypre_MAlloc( size_t size )
    {
       ptr = NULL;
    }
-
+   mempush(ptr,size,0);
    return (char*)ptr;
 }
 
@@ -125,6 +125,7 @@ hypre_CAlloc( size_t count,
 #else
       gpuErrchk( cudaMallocManaged(&ptr,size,CUDAMEMATTACHTYPE) );
       memset(ptr,0,count*elt_size);
+      printf("THIS SHOULD NOT BE CALLED \n");
       mempush(ptr,size,0);
 #endif
 #else
@@ -148,13 +149,15 @@ hypre_CAlloc( size_t count,
    {
       ptr = NULL;
    }
-
+   // mempush(ptr,size,0); Taken care of in hypre_Malloc
    return(char*) ptr;
 }
 
 #if defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_SMS)
 size_t memsize(const void *ptr){
-return ((size_t*)ptr)[-MEM_PAD_LEN];
+  if (ptr!=NULL)
+    return ((size_t*)ptr)[-MEM_PAD_LEN];
+  return 0;
 }
 #endif
 /*--------------------------------------------------------------------------
@@ -214,28 +217,36 @@ hypre_ReAlloc( char   *ptr,
      ptr = (char*)malloc(size);
 #endif
    }
+   else if (size == 0){
+     hypre_Free(ptr);
+     return NULL;
+   }
    else
      {
 #ifdef HYPRE_USE_SMS
        if (queryPointer(ptr)==memoryTypeHost){
        size_t *sptr=(size_t*)ptr-MEM_PAD_LEN;
+       mempush(ptr,0,1);
        ptr = (char*)realloc(sptr, size+sizeof(size_t)*MEM_PAD_LEN);
        size_t *sp=(size_t*)ptr;
        *sp=size;
        ptr=(void*)(&sp[MEM_PAD_LEN]);
+       mempush(ptr,size,0);
      } else { /* assumes that it is a managed pointer if it is not a host pointer for now */
      void *nptr;
+     //printf("MANAGED MEMORY REALLOCATION\n");
      gpuErrchk( cudaMallocManaged(&nptr,size+sizeof(size_t)*MEM_PAD_LEN,CUDAMEMATTACHTYPE) );
      size_t old_size=memsize((void*)ptr);
-     size_t *sp=(size_t*)ptr;
+     size_t *sp=(size_t*)nptr;
      *sp=size;
      nptr=(void*)(&sp[MEM_PAD_LEN]);
      if (size>old_size)
        memcpy(nptr,ptr,old_size); /* This should be done on the device */
      else
        memcpy(nptr,ptr,size); /* This should be done on the device */
-     hypre_Free(ptr);
+     hypre_TFree(ptr);
      ptr=(char*) nptr;
+     mempush(ptr,size,0);
    }
 #else
 	   ptr = (char*)realloc(ptr, size);
@@ -249,7 +260,7 @@ hypre_ReAlloc( char   *ptr,
       hypre_OutOfMemory(size);
    }
 #endif
-
+   //mempush(ptr,size,0);
    return ptr;
 }
 
@@ -263,6 +274,7 @@ hypre_Free( char *ptr )
 {
    if (ptr)
    {
+     mempush((void*)ptr,0,1);
 #ifdef HYPRE_USE_UMALLOC
       HYPRE_Int threadid = hypre_GetThreadID();
 
@@ -272,6 +284,7 @@ hypre_Free( char *ptr )
 #ifdef HYPRE_USE_MANAGED_SCALABLE
       cudaSafeFree(ptr,MEM_PAD_LEN);
 #else
+      //printf("WRONG FREE\n");
       mempush(ptr,0,1);
       cudaSafeFree(ptr,0);
 #endif
@@ -333,7 +346,7 @@ hypre_MAllocPinned( size_t size )
    {
       ptr = NULL;
    }
-
+   //mempush(ptr,size,0);
    return (char*)ptr;
 }
 /*--------------------------------------------------------------------------
@@ -367,7 +380,7 @@ hypre_MAllocHost( size_t size )
    {
       ptr = NULL;
    }
-
+   mempush(ptr,size,0);
    return (char*)ptr;
 }
 
@@ -391,10 +404,15 @@ hypre_CAllocHost( size_t count,
 #endif
       HYPRE_Int threadid = hypre_GetThreadID();
 
-ptr = _ucalloc_(count, elt_size);
+      ptr = _ucalloc_(count, elt_size);
 
 #else
-     ptr = calloc(count, elt_size);
+#ifdef HYPRE_USE_SMS
+      ptr=hypre_MAllocHost(count*elt_size);
+      memset(ptr,0,count*elt_size);
+#else
+      ptr = calloc(count, elt_size);
+#endif
 #endif
 
 #if 1
@@ -409,7 +427,7 @@ ptr = _ucalloc_(count, elt_size);
    {
       ptr = NULL;
    }
-
+   //mempush(ptr,size,0); Taken care of in MallocHost
    return(char*) ptr;
 }
 /*--------------------------------------------------------------------------
@@ -420,6 +438,7 @@ char *
 hypre_ReAllocHost( char   *ptr,
                size_t  size )
 {
+  printf("OMG call to hypre_ReAllocHost; Needs to be fixed \n");
   if (ptr == NULL)
    {
           ptr = (char*)malloc(size);
@@ -464,11 +483,17 @@ char *hypre_MallocManaged( size_t size )
    void *ptr=NULL;
 
    if (size > 0){
+     //fprintf(stderr,"hypre_MallocManaged %zu\n",size+sizeof(size_t)*MEM_PAD_LEN);
+     gpuErrchk(cudaPeekAtLastError());
+     gpuErrchk(cudaDeviceSynchronize());
      gpuErrchk( cudaMallocManaged(&ptr,size+sizeof(size_t)*MEM_PAD_LEN,CUDAMEMATTACHTYPE) );
+     //ptr=hypre_MAlloc(size);
+     //gpuErrchk( cudaMalloc(&ptr,size+sizeof(size_t)*MEM_PAD_LEN,CUDAMEMATTACHTYPE) );
      size_t *sp=(size_t*)ptr;
      *sp=size;
      ptr=(void*)(&sp[MEM_PAD_LEN]);
- 
+     mempush(ptr,size,0);
    }
+
    return (char*)ptr;
 }

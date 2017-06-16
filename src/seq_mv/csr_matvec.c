@@ -824,7 +824,9 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
     hypre_int jj;
     for(jj=0;jj<5;jj++)
       s[jj]=HYPRE_STREAM(jj);
+#ifdef USE_NVTX
     nvtxNameCudaStreamA(s[4], "HYPRE_COMPUTE_STREAM");
+#endif
     hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
     myid++;
     POP_RANGE;

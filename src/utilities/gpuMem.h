@@ -64,6 +64,7 @@ hypre_int checkDeviceProps();
 hypre_int pointerIsManaged(const void *ptr);
 void makePointerManaged(void **ptr, size_t size);
 void ReAllocManaged(void **ptr);
+void ReAllocManagedDebug(void **ptr,size_t size2);
 /*
  * Global struct for keeping HYPRE GPU Init state
  */

@@ -12,6 +12,7 @@
 #include <signal.h>
 #if defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_SMS)
 #include <cuda_runtime_api.h>
+#include <cuda.h>
 #define CUDAMEMATTACHTYPE cudaMemAttachGlobal
 #define MEM_PAD_LEN 1
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -45,6 +46,39 @@ static inline memoryType_t queryPointer(const void *ptr)
   CUresult err = cuPointerGetAttributes(3, attr, data, (CUdeviceptr)ptr);
   if (err != CUDA_SUCCESS) {
     printf("queryPointer error: %d\n", err);
+    exit(1);
+  }
+
+  memoryType_t type;
+
+  if (context == NULL) {
+    type = memoryTypeHost;
+  } else {
+    if (mem_type == CU_MEMORYTYPE_DEVICE) {
+      if (is_managed)
+        type = memoryTypeManaged;
+      else
+        type = memoryTypeDevice;
+    } else {
+      type = memoryTypeHostPinned;
+    }
+  }
+
+  return type;
+}
+static inline memoryType_t queryPointerOffset(const void *ptr)
+{
+  CUpointer_attribute attr[] = {CU_POINTER_ATTRIBUTE_CONTEXT,
+                                CU_POINTER_ATTRIBUTE_MEMORY_TYPE,
+                                CU_POINTER_ATTRIBUTE_IS_MANAGED};
+  CUcontext context = NULL;
+  CUmemorytype mem_type;
+  int is_managed = 0;
+  void* data[] = {&context, &mem_type, &is_managed};
+  size_t *sptr=(size_t*)ptr-1;
+  CUresult err = cuPointerGetAttributes(3, attr, data, (CUdeviceptr)sptr);
+  if (err != CUDA_SUCCESS) {
+    printf("queryPointerOffset error: %d\n", err);
     exit(1);
   }
 

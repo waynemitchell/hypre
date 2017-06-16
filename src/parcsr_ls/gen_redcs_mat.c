@@ -524,8 +524,8 @@ HYPRE_Int hypre_GenerateSubComm(MPI_Comm comm, HYPRE_Int participate, MPI_Comm *
 
       hypre_MPI_Op_free (&hypre_MPI_MERGE);
 
-      hypre_HostTFree(list_len);
-      hypre_HostTFree(info);
+      hypre_TFree(list_len);
+      hypre_TFree(info);
    }
    hypre_MPI_Comm_size(comm,&num_procs);
    hypre_MPI_Comm_group(comm, &orig_group);
@@ -534,7 +534,7 @@ HYPRE_Int hypre_GenerateSubComm(MPI_Comm comm, HYPRE_Int participate, MPI_Comm *
    hypre_MPI_Group_free(&new_group);
    hypre_MPI_Group_free(&orig_group);
 
-   hypre_HostTFree(ranks);
+   hypre_TFree(ranks);
    
    *new_comm_ptr = new_comm;
    

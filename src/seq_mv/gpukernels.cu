@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
-//#include <cublas_v2.h>
+#include <cublas_v2.h>
 #include "_hypre_utilities.h"
 #define gpuErrchk2(ans) { gpuAssert2((ans), __FILE__, __LINE__); }
 inline void gpuAssert2(cudaError_t code, const char *file, hypre_int line)
@@ -191,7 +191,7 @@ void CSRDiagScaleKernel(HYPRE_Real *x_data, HYPRE_Real *y_data, HYPRE_Real *A_da
     ptrChk(y_data);
     ptrChk(A_data);
     ptrChk(A_i);
-    
+    fprintf(stderr,"MIGHT NEED PREFETCHING\n");
     CSRDiagScaleKernel<<<num_blocks,num_threads,0,HYPRE_STREAM(4)>>>(x_data,y_data,A_data,A_i,local_size);
     gpuErrchk2(cudaStreamSynchronize(HYPRE_STREAM(4)));
   }

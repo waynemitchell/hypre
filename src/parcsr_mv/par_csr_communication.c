@@ -74,7 +74,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
 #ifdef HYPRE_USE_SMS
 	   //send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
 	   //ReAllocManaged((void**)&send_data); // This should be a device buffer
-	   send_data=hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
+	   send_data=(void*)hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
 #else
 	   send_data = hypre_PinnedTAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
 #endif
@@ -83,7 +83,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          if (!recv_data)
          {
 #ifdef HYPRE_USE_SMS
-	   recv_data=hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));
+	   recv_data=(void*)hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));
 #else
 	   recv_data = hypre_CTAlloc(HYPRE_Complex, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
 #endif
@@ -112,7 +112,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          {
 	   //fprintf(stderr,"HYPRE_COMM_PKG_JOB_COMPLEX_TRANSPOSE:\n"); raise(SIGABRT);
 #ifdef HYPRE_USE_SMS
-	   recv_data = hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
+	   recv_data = (void*)hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));
 #else
             recv_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
 #endif
@@ -120,7 +120,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          if (!send_data)
          {
 #ifdef HYPRE_USE_SMS
-	   send_data = hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));
+	   send_data =  (void*)hypre_MallocManaged(sizeof(HYPRE_Complex)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));
 #else
             send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
 #endif
@@ -148,7 +148,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          if (!send_data)
          {
 #ifdef HYPRE_USE_SMS
-	   send_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends)); 
+	   send_data = (void*)hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends)); 
 #else
             send_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
 #endif
@@ -156,7 +156,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          if (!recv_data)
          {
 #ifdef HYPRE_USE_SMS
-	   recv_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs)); 
+	   recv_data = (void*)hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs)); 
 #else
             recv_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
 #endif
@@ -184,7 +184,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          if (!recv_data)
          {
 #ifdef HYPRE_USE_SMS
-	    recv_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
+	   recv_data = (void*)hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends));  
 #else
             recv_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends)); 
 #endif 
@@ -192,7 +192,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          if (!send_data)
          {
 #ifdef HYPRE_USE_SMS
-	    send_data = hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
+	   send_data = (void*)hypre_MallocManaged(sizeof(HYPRE_Int)*hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
 #else
             send_data = hypre_TAlloc(HYPRE_Int, hypre_ParCSRCommPkgRecvVecStart(comm_pkg, num_recvs));  
 #endif

@@ -47,7 +47,6 @@ hypre_ParVectorCreate( MPI_Comm   comm,
    }
    vector = hypre_CTAlloc(hypre_ParVector, 1);
    hypre_MPI_Comm_rank(comm,&my_id);
-
    if (!partitioning)
    {
       hypre_MPI_Comm_size(comm,&num_procs);

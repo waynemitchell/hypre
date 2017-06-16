@@ -185,7 +185,7 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
 
    HYPRE_Real    wall_time;   /* for debugging instrumentation */
 
-#ifdef HYPRE_USE_GPU
+#ifdef HYPRE_USE_GPU_OFF
    if (!hypre_ParCSRMatrixIsManaged(A)){
      hypre_fprintf(stderr,"ERROR:: INVALID A in hypre_BoomerAMGSetup::Address %p\n",A);
      //exit(2);

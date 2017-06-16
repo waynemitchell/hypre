@@ -9,7 +9,7 @@
 #include <sched.h>
 #include <errno.h>
 hypre_int ggc(hypre_int id);
-
+#define FULL_WARN 1
 /* Global struct that holds device,library handles etc */
 struct hypre__global_struct hypre__global_handle = { .initd=0, .device=0, .device_count=1,.memoryHWM=0};
 
@@ -106,7 +106,7 @@ void hypre_GPUInit(hypre_int use_device){
 
 
 void hypre_GPUFinalize(){
-  
+  mempush(NULL,0,2);
   cusparseErrchk(cusparseDestroy(HYPRE_CUSPARSE_HANDLE));
   
   cublasErrchk(cublasDestroy(HYPRE_CUBLAS_HANDLE));
@@ -177,7 +177,10 @@ void MemPrefetchSized(const void *ptr,size_t size,hypre_int device,cudaStream_t 
   PUSH_RANGE_DOMAIN("MemPreFetchSized",4,0);
   /* Do a prefetch every time until a possible UM bug is fixed */
   if (size>0){
-    gpuErrchk(cudaMemPrefetchAsync(ptr,size,device,stream));
+    if (queryPointerOffset(ptr)==memoryTypeManaged){
+      gpuErrchk(cudaMemPrefetchAsync(ptr,size,device,stream));
+    }else{ printf("ABORTING FOR MEMTYPE %d\n",queryPointerOffset(ptr));raise(SIGABRT);raise(SIGABRT);}
+    
     POP_RANGE_DOMAIN(0);
     return;
   } 
@@ -226,6 +229,11 @@ cusparseHandle_t getCusparseHandle(){
 size_t mempush(const void *ptr, size_t size, hypre_int action){
   static node* head=NULL;
   static hypre_int nc=0;
+  return 0;
+  if (action==2){
+    printlist(head,nc);
+    return 0;
+  }
   node *found=NULL;
   if (!head){
     if ((size<=0)||(action==1)) {
@@ -249,6 +257,8 @@ size_t mempush(const void *ptr, size_t size, hypre_int action){
       } else {
 #ifdef FULL_WARN
 	fprintf(stderr,"ERROR :: Pointer for deletion not found in linked list %p\n",ptr);
+	printlist(head,nc);
+	raise(SIGABRT);raise(SIGABRT);
 #endif
 	return 0;
       }
@@ -259,8 +269,9 @@ size_t mempush(const void *ptr, size_t size, hypre_int action){
       found=memfind(head,ptr);
       if (found){
 #ifdef FULL_WARN
-	fprintf(stderr,"ERROR :: Pointer for insertion already in use in linked list %p\n",ptr);
+	fprintf(stderr,"ERROR :: Pointer for insertion already in use in linked list (%p,%p) %zu new size %zu\n",found->ptr,ptr,found->size,size);
 	//printlist(head,nc);
+	raise(SIGABRT);raise(SIGABRT);
 #endif
 	return 0;
       } else {
@@ -271,12 +282,14 @@ size_t mempush(const void *ptr, size_t size, hypre_int action){
     }
 
     // Getting allocation size
+    if (ptr==NULL) return 0;
     found=memfind(head,ptr);
     if (found){
       return found->size;
     } else{
 #ifdef FULL_WARN
-      fprintf(stderr,"ERROR :: Pointer for size check NOT found in linked list\n");
+      fprintf(stderr,"ERROR :: Pointer for size check NOT found in linked list %p\n",ptr);
+      raise(SIGABRT);raise(SIGABRT);
 #endif
       return 0;
     }
@@ -296,6 +309,7 @@ node *memfind(node *head, const void *ptr){
 void memdel(node **head, node *found){
   node *next;
   if (found==*head){
+    //printf("Deleted %p of size %zu \n",(*head)->ptr,(*head)->size);
     next=(*head)->next;
     free(*head);
     *head=next;
@@ -316,15 +330,17 @@ void meminsert(node **head, const void  *ptr,size_t size){
   nhead->size=size;
   nhead->next=*head;
   *head=nhead;
+  //printf("INsert %p %zu\n",ptr,size);
   return;
 }
 
 void printlist(node *head,hypre_int nc){
   node *next;
   next=head;
-  printf("Node count %d \n",nc);
+  printf("printlist:: Node count %d \n",nc);
+  int lc=0;
   while(next!=NULL){
-    printf("Address %p of size %zu \n",next->ptr,next->size);
+    printf("%d Address %p of size %zu \n",++lc,next->ptr,next->size);
     next=next->next;
   }
 }
@@ -504,14 +520,14 @@ hypre_int checkDeviceProps(){
   return HYPRE_GPU_CMA;
 }
 hypre_int pointerIsManaged(const void *ptr){
-  if (queryPointer(ptr) == memoryTypeHost) return 0;
-  return 1;
+  if (queryPointerOffset(ptr) == memoryTypeManaged) return 1;
+  return 0;
   
-  struct cudaPointerAttributes ptr_att;
-  if (cudaPointerGetAttributes(&ptr_att,ptr)!=cudaSuccess) {
-    return 0;
-  }
-  return ptr_att.isManaged;
+  /* struct cudaPointerAttributes ptr_att; */
+/*   if (cudaPointerGetAttributes(&ptr_att,ptr)!=cudaSuccess) { */
+/*     return 0; */
+/*   } */
+/*   return ptr_att.isManaged; */
 }
 void makePointerManaged(void **ptr, size_t size)
 {
@@ -524,25 +540,74 @@ void makePointerManaged(void **ptr, size_t size)
     *sp=size;
     buf=(void*)(&sp[MEM_PAD_LEN]);
     memcpy(buf, *ptr, size);
-    free(*ptr);
+    free(*ptr); // This is not right //
     *ptr = buf;
   }    
 }
 void ReAllocManaged(void **ptr){
   if (*ptr == NULL) return;
-  memoryType_t mtype = queryPointer(*ptr);
+  size_t *sptr=(size_t*)(*ptr)-MEM_PAD_LEN;
+  memoryType_t mtype = queryPointer(sptr);
   if (mtype == memoryTypeHost){
     size_t size=memsize(*ptr);
-    char *buf=NULL;
+    void *buf=NULL;
     //printf("ReAllocManaged swithcing %p to managed for size %zu\n",*ptr,size+sizeof(size_t)*MEM_PAD_LEN);
-    gpuErrchk(cudaMallocManaged((void**)&buf, size+sizeof(size_t)*MEM_PAD_LEN, CUDAMEMATTACHTYPE));
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+    gpuErrchk(cudaMallocManaged(&buf, size+sizeof(size_t)*MEM_PAD_LEN, CUDAMEMATTACHTYPE));
     size_t *sp=(size_t*)buf;
     *sp=size;
     buf=(void*)(&sp[MEM_PAD_LEN]);
     memcpy(buf, *ptr, size);
-    hypre_Free(*ptr);
+    //printf("Getting ready to delete %p(%p) of size %zu \n",sptr,*ptr,size);
+    {
+      //size_t *sptr=(size_t*)*ptr-MEM_PAD_LEN;
+
+      //printf("Free actual %p %zu %zu %zu %d \n",*ptr,*sptr,mempush(*ptr,0,0),*sp,queryPointer(ptr));
+      //mempush(*ptr,0,1);
+      //free((void*)sptr);
+      hypre_TFree(*ptr);
+    }
+    //hypre_TFree(*ptr);
     *ptr = buf;
+    mempush(*ptr,size,0);
   } else if (mtype == memoryTypeDevice) fprintf(stderr,"ERROR:: Switch from device space not supported \n");
-  else if (mtype== memoryTypeHostPinned) fprintf(stderr,"ERROR:: Switch from MANAGED space not supported \n");
+  else if (mtype== memoryTypeHostPinned) fprintf(stderr,"ERROR:: Switch from Pinned space not supported \n");
+
+}
+void ReAllocManagedDebug(void **ptr,size_t size2){
+  if (*ptr == NULL) return;
+  static int fc=0;
+  size_t *sptr=(size_t*)(*ptr)-MEM_PAD_LEN;
+  memoryType_t mtype = queryPointer(sptr);
+  if (mtype == memoryTypeHost){
+    size_t size=memsize(*ptr);
+    void *buf=NULL;
+    //printf("ReAllocManaged swithcing %p to managed for size %zu\n",*ptr,size+sizeof(size_t)*MEM_PAD_LEN);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+    gpuErrchk(cudaMallocManaged(&buf, size+sizeof(size_t)*MEM_PAD_LEN, CUDAMEMATTACHTYPE));
+    size_t *sp=(size_t*)buf;
+    *sp=size;
+    buf=(void*)(&sp[MEM_PAD_LEN]);
+    memcpy(buf, *ptr, size);
+    
+    {
+      //size_t *sptr=(size_t*)*ptr-MEM_PAD_LEN;
+      fc++;
+      if ((fc>=4) &&(fc<=7)){
+	printf("Getting ready to delete %p(%p) of size %zu %zu\n",sptr,*ptr,size,size2);
+	printf("Free actual %p %zu %zu %zu %d \n",*ptr,*sptr,mempush(*ptr,0,0),*sp,queryPointer(ptr));
+      }
+      //mempush(*ptr,0,1);
+      //free((void*)sptr);
+      //if (fc==8) hypre_TFree(*ptr);
+    }
+    //hypre_TFree(*ptr);
+    *ptr = buf;
+    mempush(*ptr,size,0);
+  } else if (mtype == memoryTypeDevice) fprintf(stderr,"ERROR:: Switch from device space not supported \n");
+  else if (mtype== memoryTypeHostPinned) fprintf(stderr,"ERROR:: Switch from Pinned space not supported \n");
+  //else if (mtype== memoryTypeManaged) fprintf(stderr,"ERROR:: Switch from MANAGED space not supported \n");
 }
 #endif

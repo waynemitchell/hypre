@@ -130,6 +130,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 
       hypre_VectorData(x_tmp) = (HYPRE_Complex *)persistent_comm_handle->recv_data;
       hypre_SeqVectorSetDataOwner(x_tmp, 0);
+      ptrChk(hypre_VectorData(x_tmp));
       POP_RANGE;
 #endif
    }
@@ -524,7 +525,7 @@ hypre_ParCSRMatrixMatvecT( HYPRE_Complex       alpha,
                   += y_buf_data[jv][index++];
          }
       }
-        
+   //mempush(NULL,0,2);
    hypre_SeqVectorDestroy(y_tmp);
    y_tmp = NULL;
    if (!use_persistent_comm)

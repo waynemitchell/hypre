@@ -32,7 +32,7 @@ hypre_ParKrylovFree( char *ptr )
 {
    HYPRE_Int ierr = 0;
 
-   hypre_Free( ptr );
+   hypre_TFree( ptr );
 
    return ierr;
 }
