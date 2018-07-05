@@ -13,7 +13,7 @@
 #ifndef hypre_GPU_ERROR_HEADER
 #define hypre_GPU_ERROR_HEADER
 
-#if defined(HYPRE_MEMORY_GPU) || defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_OMP45)
+#if defined(HYPRE_MEMORY_GPU) || defined(HYPRE_USE_MANAGED) || defined(HYPRE_USE_OMP45)|| defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 
 //#include <cuda_runtime_api.h>
 #ifdef __cplusplus

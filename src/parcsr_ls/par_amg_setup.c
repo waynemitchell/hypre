@@ -517,6 +517,7 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
       }
       if (hypre_ParAMGDataL1Norms(amg_data))
       {
+	printf("AMG FREEING %p",hypre_ParAMGDataL1Norms(amg_data)[i]);
          for (i=0; i < old_num_levels; i++)
             if (hypre_ParAMGDataL1Norms(amg_data)[i])
               hypre_TFree(hypre_ParAMGDataL1Norms(amg_data)[i], HYPRE_MEMORY_HOST);
@@ -2096,13 +2097,16 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                HYPRE_Int local_P_sz = hypre_CSRMatrixNumCols(hypre_ParCSRMatrixDiag(P));
                if (local_sz < local_P_sz)
                {
+		 
                   hypre_Vector* Vtemp_local = hypre_ParVectorLocalVector(Vtemp);
                   hypre_TFree(hypre_VectorData(Vtemp_local), HYPRE_MEMORY_SHARED); 
                   hypre_VectorSize(Vtemp_local) = local_P_sz; 
                   hypre_VectorData(Vtemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_SHARED);
+		  printf("AND WE HAVE IT %d %p \n",hypre_ParVectorLocalVector(Vtemp)->mapped,hypre_VectorData(Vtemp_local) );
                   if (Ztemp)
                   {
                      hypre_Vector* Ztemp_local = hypre_ParVectorLocalVector(Ztemp);
+		     printf("ZTEMP AND WE HAVE IT %d \n",Ztemp_local->mapped);
                      hypre_TFree(hypre_VectorData(Ztemp_local), HYPRE_MEMORY_SHARED); 
                      hypre_VectorSize(Ztemp_local) = local_P_sz; 
                      hypre_VectorData(Ztemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_HOST);
@@ -2110,6 +2114,7 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                   if (Ptemp)
                   {
                      hypre_Vector* Ptemp_local = hypre_ParVectorLocalVector(Ptemp);
+		     printf("PTEMP AND WE HAVE IT %d \n",Ptemp_local->mapped);
                      hypre_TFree(hypre_VectorData(Ptemp_local), HYPRE_MEMORY_HOST); 
                      hypre_VectorSize(Ptemp_local) = local_P_sz; 
                      hypre_VectorData(Ptemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_HOST);
@@ -2117,6 +2122,7 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                   if (Rtemp)
                   {
                      hypre_Vector* Rtemp_local = hypre_ParVectorLocalVector(Rtemp);
+		     printf("RTEMP AND WE HAVE IT %d \n",Rtemp_local->mapped);
                      hypre_TFree(hypre_VectorData(Rtemp_local), HYPRE_MEMORY_HOST); 
                      hypre_VectorSize(Rtemp_local) = local_P_sz; 
                      hypre_VectorData(Rtemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_HOST);
@@ -2199,6 +2205,15 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                hypre_ParCSRMatrixOwnsColStarts(P) = 0; 
                if (num_procs > 1) hypre_MatvecCommPkgCreate(A_H); 
                /*hypre_ParCSRMatrixDestroy(P); */
+	       
+	       /*  Unmap d_diag since it gets mapped inside hypre_ParCSRComputeL1Norms
+		*  The mapping is not used here so this is all unnecesary. Needs a fix.
+		*/
+		   
+#ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
+	       HYPRE_Int num_rows = hypre_ParCSRMatrixNumRows(A_array[level]);
+#pragma omp target exit data map(delete:d_diag[0:num_rows]) if (num_rows>0)
+#endif
                hypre_TFree(d_diag, HYPRE_MEMORY_SHARED); 
                /* Set NonGalerkin drop tol on each level */
                if (level < nongalerk_num_tol) nongalerk_tol_l = nongalerk_tol[level];

@@ -22,6 +22,8 @@
 
 #include "_hypre_parcsr_ls.h"
 #include "par_amg.h"
+#include "inttypes.h"
+
 
 /*--------------------------------------------------------------------------
  * hypre_BoomerAMGCycle
@@ -110,13 +112,19 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
    num_grid_sweeps   = hypre_ParAMGDataNumGridSweeps(amg_data);
 
    /* Initialize */
-
+   //printf("HERE IN PAR_ADD)CYCLE.C\n");
+   //for(int l=1;l<num_levels;l++)
+   //  printf("%d RCDIFF AT START %d DRC = %d \n",l,(hypre_ParVectorLocalVector(U_array[l])->drc-hypre_ParVectorLocalVector(U_array[l])->hrc),hypre_ParVectorLocalVector(U_array[l])->drc);
+   //for (level = 0; level < num_levels; level++) DiffHD(F_array[level]);
+   //for (level = 0; level < num_levels; level++) UpdateHRC(hypre_ParVectorLocalVector(F_array[level]));
+   //for (level = 0; level < num_levels; level++) SyncVectorToHost(hypre_ParVectorLocalVector(F_array[level]));
+   //SyncVectorToHost(hypre_ParVectorLocalVector(Rtilde));
    addlvl = hypre_max(additive, mult_additive);
    addlvl = hypre_max(addlvl, simple);
    if (add_last_lvl == -1 ) add_end = num_levels-1;
    else add_end = add_last_lvl;
    Solve_err_flag = 0;
-
+   //printRC(hypre_ParVectorLocalVector(Xtilde),"START  of par_add_cycle.c");
    /*---------------------------------------------------------------------
     * Main loop of cycling --- multiplicative version --- V-cycle
     *--------------------------------------------------------------------*/
@@ -125,8 +133,14 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
    rlx_down = grid_relax_type[1];
    rlx_up = grid_relax_type[2];
    rlx_coarse = grid_relax_type[3];
+   /* for (level = 0; level < num_levels; level++) printf("%dXTILDE  %" PRIuPTR ", %" PRIuPTR " :: %" PRIuPTR ",%" PRIuPTR "\n",level, */
+   /* 							(uintptr_t)hypre_ParVectorLocalVector(Xtilde)->data, */
+   /* 							(uintptr_t)(hypre_ParVectorLocalVector(Xtilde)->data+hypre_ParVectorLocalVector(Xtilde)->size), */
+   /* 						       (uintptr_t)(hypre_ParVectorLocalVector(U_array[level])->data), */
+   /* 						       (uintptr_t)(hypre_ParVectorLocalVector(U_array[level])->data+hypre_ParVectorLocalVector(U_array[level])->size)); */
    for (level = 0; level < num_levels-1; level++)
    {
+     
       fine_grid = level;
       coarse_grid = level + 1;
 
@@ -135,29 +149,41 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
       l1_norms_lvl = l1_norms[level];
 
       hypre_ParVectorSetConstantValues(U_array[coarse_grid], 0.0); 
-
+      UpdateDRC(hypre_ParVectorLocalVector(Xtilde)); // Because U_array[1->] and Xtilde share the same space
+      // The allocation for U_array[coarse_grid] overlaps with the allocation of Xtilde
+      // So U_array[coarse_grid] is unmapped below to prevent mapping failure in
+      // Xtilde. Ramesh June 20 2018
+      //hypre_SeqVectorUnMapFromDevice(hypre_ParVectorLocalVector(U_array[coarse_grid]));
+      //printf(" Address range is %" PRIuPTR ", %" PRIuPTR " \n",(uintptr_t)hypre_VectorData(hypre_ParVectorLocalVector(U_array[coarse_grid])),(uintptr_t)(hypre_VectorData(hypre_ParVectorLocalVector(U_array[coarse_grid]))+hypre_ParVectorLocalVector(U_array[coarse_grid])->size));
       if (level < addlvl || level > add_end) /* multiplicative version */
       {
          /* smoothing step */
-
+	// WARNING:: THE SYNC CODE IN THE MULTIPLICATIVE VERSION IS NOT TESTED AFAIK
          if (rlx_down == 0)
          {
+	   //printf("RLX_DOWN ZERO %d\n",rlx_down);
             HYPRE_Real *A_data = hypre_CSRMatrixData(hypre_ParCSRMatrixDiag(A_array[fine_grid]));
             HYPRE_Int *A_i = hypre_CSRMatrixI(hypre_ParCSRMatrixDiag(A_array[fine_grid]));
             num_rows = hypre_CSRMatrixNumRows(hypre_ParCSRMatrixDiag(A_array[fine_grid]));
+	    SyncVectorToHost(hypre_ParVectorLocalVector(U_array[fine_grid]));
+	    //SyncVectorToHost(hypre_ParVectorLocalVector(Vtemp));
             for (j=0; j < num_grid_sweeps[1]; j++)
             {
-             hypre_ParVectorCopy(F_array[fine_grid],Vtemp);
+	      hypre_ParVectorCopy(F_array[fine_grid],Vtemp); /* THIS AND LINE BELOW COULD BE OUTSIDE THE LOOP */
+	     SyncVectorToHost(hypre_ParVectorLocalVector(Vtemp));
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(i) HYPRE_SMP_SCHEDULE
 #endif
              for (i = 0; i < num_rows; i++)
                u_data[i] = relax_weight[level]*v_data[i] / A_data[A_i[i]];
             }
+	    UpdateHRC(hypre_ParVectorLocalVector(U_array[fine_grid]));
+	    if (fine_grid!=0) UpdateHRC(hypre_ParVectorLocalVector(Xtilde));
          }
 
          else if (rlx_down != 18)
          {
+	   //printf("%d RLX_DOWN %d %d\n",level,rlx_down,num_grid_sweeps[1]);
             /*hypre_BoomerAMGRelax(A_array[fine_grid],F_array[fine_grid],NULL,rlx_down,0,*/
             for (j=0; j < num_grid_sweeps[1]; j++)
             {
@@ -166,11 +192,15 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
                    relax_weight[fine_grid], omega[fine_grid],
                    l1_norms[level], U_array[fine_grid], Vtemp, Ztemp);
                hypre_ParVectorCopy(F_array[fine_grid],Vtemp);
+	       //printf("%d DRC = %d , HRC = %d \n",fine_grid,hypre_ParVectorLocalVector(U_array[fine_grid])->drc,hypre_ParVectorLocalVector(U_array[fine_grid])->hrc);
             }
          }
          else
          {
+	   //printf("RLX_DOWN ELSE %d\n",rlx_down);
             num_rows = hypre_CSRMatrixNumRows(hypre_ParCSRMatrixDiag(A_array[fine_grid]));
+	    SyncVectorToHost(hypre_ParVectorLocalVector(U_array[fine_grid]));
+	    SyncVectorToHost(hypre_ParVectorLocalVector(Vtemp));
             for (j=0; j < num_grid_sweeps[1]; j++)
             {
              hypre_ParVectorCopy(F_array[fine_grid],Vtemp);
@@ -180,6 +210,7 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
 	     for (i = 0; i < num_rows; i++)
                u_data[i] += v_data[i] / l1_norms_lvl[i];
             }
+	    UpdateHRC(hypre_ParVectorLocalVector(U_array[fine_grid]));
          }
      
          alpha = -1.0;
@@ -189,29 +220,60 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
 
          alpha = 1.0;
          beta = 0.0;
+	 //UpdateDRC(hypre_ParVectorLocalVector(F_array[coarse_grid]));
+	 /* printf("%d Pre_MATVET VTEMP (%d %d ) F_array( %d %d ) \n",level,hypre_ParVectorLocalVector(Vtemp)->drc, */
+	 /* 	hypre_ParVectorLocalVector(Vtemp)->hrc, */
+	 /* 	hypre_ParVectorLocalVector(F_array[coarse_grid])->drc, */
+	 /* 	hypre_ParVectorLocalVector(F_array[coarse_grid])->hrc); */
+						 
          hypre_ParCSRMatrixMatvecT(alpha,R_array[fine_grid],Vtemp,
                                       beta,F_array[coarse_grid]);
+	 UpdateDRC(hypre_ParVectorLocalVector(Rtilde)); // Since F_Array and Rtilde share space
       }
       else /* additive version */
       {
-         hypre_ParVectorCopy(F_array[fine_grid],Vtemp);
+	//printf(" %d ADDITIVE %d\n",level,rlx_down);
+	hypre_ParVectorCopy(F_array[fine_grid],Vtemp);
+	//printf("Copy 1\n");
          if (level == 0) /* compute residual */
          {
-            hypre_ParVectorCopy(Vtemp, Rtilde);
+            hypre_ParVectorCopy(Vtemp, Rtilde); // F_arrray needs DRC update
+	    for(int l=1;l<num_levels;l++)
+	      UpdateDRC(hypre_ParVectorLocalVector(F_array[l]));
+	    //printf("Copy 2\n");
+	    //printf("XTILDE  %" PRIuPTR ", %" PRIuPTR " \n",(uintptr_t)hypre_ParVectorLocalVector(Xtilde)->data,(uintptr_t)(hypre_ParVectorLocalVector(Xtilde)->data+hypre_ParVectorLocalVector(Xtilde)->size));
+	    //hypre_ParVectorLocalVector(Xtilde)->mapped=1; // Failing to map Xtile
+	    //printf("Sizes %d %d \n",hypre_ParVectorLocalVector(U_array[fine_grid])->size,hypre_ParVectorLocalVector(Xtilde)->size);
             hypre_ParVectorCopy(U_array[fine_grid],Xtilde);
+	    for(int l=1;l<num_levels;l++)
+	      UpdateDRC(hypre_ParVectorLocalVector(U_array[l]));
+	    /* for(int l=1;l<num_levels;l++){  */
+	    /*   UpdateDRC(hypre_ParVectorLocalVector(U_array[l])); */
+	      //printf("VEC RC %d ->%d %d \n",l,hypre_ParVectorLocalVector(U_array[l])->hrc,hypre_ParVectorLocalVector(U_array[l])->drc);
+	      //UpdateDRC(hypre_ParVectorLocalVector(F_array[l]));
+	    //}
+	    //printf("Copy 3\n");
          }
          alpha = 1.0;
          beta = 0.0;
+	 //printf("Pre Matvec\n");
          hypre_ParCSRMatrixMatvecT(alpha,R_array[fine_grid],Vtemp,
                                       beta,F_array[coarse_grid]);
+	 UpdateDRC(hypre_ParVectorLocalVector(Rtilde));
+	 
+	 //printf("Psot Matvec\n");
       }
-   }
-
+   } /* end of level loop */
+   
+   //printf("hERE WE ARE\n");
    /* additive smoothing and solve coarse grid */ 
    if (addlvl < num_levels)
    {
       if (simple > -1)
       {
+        //printf("Simple\n");
+	SyncVectorToHost(hypre_ParVectorLocalVector(Xtilde));
+	SyncVectorToHost(hypre_ParVectorLocalVector(Rtilde));
          x_global = hypre_VectorData(hypre_ParVectorLocalVector(Xtilde));
          r_global = hypre_VectorData(hypre_ParVectorLocalVector(Rtilde));
          n_global = hypre_VectorSize(hypre_ParVectorLocalVector(Xtilde));
@@ -220,11 +282,17 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
 #endif
 	 for (i=0; i < n_global; i++)
 	    x_global[i] += D_inv[i]*r_global[i];
+	 
+	 UpdateHRC(hypre_ParVectorLocalVector(Xtilde));
+	 //printRC(hypre_ParVectorLocalVector(Xtilde),"line 262 of par_add_cycle");
+	 for(int l=1;l<num_levels;l++)
+	      UpdateHRC(hypre_ParVectorLocalVector(U_array[l]));
       }
       else
       {
          if (num_grid_sweeps[1] > 1)
          {
+	   //printf("NOT SIMPLE \n");
             n_global = hypre_VectorSize(hypre_ParVectorLocalVector(Rtilde));
             hypre_ParVector *Tmptilde = hypre_CTAlloc(hypre_ParVector,  1, HYPRE_MEMORY_HOST);
             hypre_Vector *Tmptilde_local = hypre_SeqVectorCreate(n_global);   
@@ -236,12 +304,18 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
             hypre_ParCSRMatrixMatvec(-1.0, Atilde, Tmptilde, 1.0, Rtilde);
             hypre_ParVectorDestroy(Tmptilde);
          }
+         //printf("THE MATVEC THEN\n");
          hypre_ParCSRMatrixMatvec(1.0, Lambda, Rtilde, 1.0, Xtilde);
+	  for(int l=1;l<num_levels;l++)
+	      UpdateDRC(hypre_ParVectorLocalVector(U_array[l]));
+	  /* for(int l=1;l<num_levels;l++) */
+	  /*   printf("%d RCDIFF %d DRC = %d \n",l,(hypre_ParVectorLocalVector(U_array[l])->drc-hypre_ParVectorLocalVector(U_array[l])->hrc),hypre_ParVectorLocalVector(U_array[l])->drc) */;
       }
       if (addlvl == 0) hypre_ParVectorCopy(Xtilde, U_array[0]);
    }
    if (add_end < num_levels -1)
    {
+     //printf("HEEEEERE %d\n",rlx_coarse);
       fine_grid = num_levels -1;
       for (j=0; j < num_grid_sweeps[3]; j++)
          if (rlx_coarse == 18)
@@ -264,21 +338,24 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
 
       if (level <= addlvl || level > add_end+1) /* multiplicative version */
       {
+	//printf("UP CYCE %d %d \n",rlx_up,rlx_order);
          alpha = 1.0;
          beta = 1.0;
          hypre_ParCSRMatrixMatvec(alpha, P_array[fine_grid], 
                                      U_array[coarse_grid],
                                      beta, U_array[fine_grid]);            
-         if (rlx_up != 18)
+         if (rlx_up != 18){
             /*hypre_BoomerAMGRelax(A_array[fine_grid],F_array[fine_grid],NULL,rlx_up,0,*/
+            //printf("UP CYCLE\n");
             for (j=0; j < num_grid_sweeps[2]; j++)
               hypre_BoomerAMGRelaxIF(A_array[fine_grid],F_array[fine_grid],
 		CF_marker_array[fine_grid],
 		rlx_up,rlx_order,2,
                 relax_weight[fine_grid], omega[fine_grid],
-                l1_norms[fine_grid], U_array[fine_grid], Vtemp, Ztemp);
+                l1_norms[fine_grid], U_array[fine_grid], Vtemp, Ztemp);}
          else if (rlx_order)
          {
+	   //printf("UP CYCLE RELAX 1\n");
             HYPRE_Int loc_relax_points[2];
             loc_relax_points[0] = -1;
             loc_relax_points[1] = 1;
@@ -290,20 +367,23 @@ hypre_BoomerAMGAdditiveCycle( void              *amg_vdata)
                                             1.0, l1_norms[fine_grid],
                                             U_array[fine_grid], Vtemp);
          }
-         else 
+         else {
+	   //printf("UP CYCLE RELAX 2 %d\n", num_grid_sweeps[2]);
             for (j=0; j < num_grid_sweeps[2]; j++)
             hypre_ParCSRRelax(A_array[fine_grid], F_array[fine_grid],
                                  1, 1, l1_norms[fine_grid],
                                  1.0, 1.0 ,0,0,0,0,
-                                 U_array[fine_grid], Vtemp, Ztemp);
+			      U_array[fine_grid], Vtemp, Ztemp);}
       }
       else /* additive version */
       {
+	//printf("THIS %d \n",fine_grid);
          alpha = 1.0;
          beta = 1.0;
          hypre_ParCSRMatrixMatvec(alpha, P_array[fine_grid], 
                                      U_array[coarse_grid],
-                                     beta, U_array[fine_grid]);            
+                                     beta, U_array[fine_grid]);         
+	 if (fine_grid!=0) UpdateDRC(hypre_ParVectorLocalVector(Xtilde));   
       }
    }
 
@@ -709,9 +789,14 @@ HYPRE_Int hypre_CreateLambda(void *amg_vdata)
    hypre_SeqVectorInitialize(Xtilde_local);
    hypre_ParVectorLocalVector(Xtilde) = Xtilde_local;   
    hypre_ParVectorOwnsData(Xtilde) = 1;
-      
+   //printf("XTILDE START END %" PRIuPTR ", %" PRIuPTR " %d %d \n",(uintptr_t)Xtilde_local->data,(uintptr_t)(Xtilde_local->data+num_rows_L),num_rows_L,Xtilde_local->size);
    x_data = hypre_VectorData(hypre_ParVectorLocalVector(Xtilde));
    r_data = hypre_VectorData(hypre_ParVectorLocalVector(Rtilde));
+
+   hypre_SeqVectorMapToDevice(Xtilde_local);
+   hypre_SeqVectorMapToDevice(Rtilde_local);
+   //UpdateHRC(Xtilde_local);
+   //UpdateHRC(Rtilde_local);
 
    cnt = 0;
    cnt_level = 0;
@@ -733,13 +818,23 @@ HYPRE_Int hypre_CreateLambda(void *amg_vdata)
       if (level != 0)
       {
          tmp_data = hypre_VectorData(hypre_ParVectorLocalVector(F_array[level]));
+	 //printf("TMP DATA %p %d\n",tmp_data,hypre_ParVectorLocalVector(U_array[level])->mapped);
          if (tmp_data) hypre_TFree(tmp_data, HYPRE_MEMORY_SHARED);
          hypre_VectorData(hypre_ParVectorLocalVector(F_array[level])) = &r_data[row_start];
+	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
+	 if (hypre_ParVectorLocalVector(F_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(F_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(F_array[level])) = 0;
+	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(F_array[level]));
+
          tmp_data = hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]));
+	 //printf("TMP DATA %p %d\n",tmp_data,hypre_ParVectorLocalVector(U_array[level])->mapped);
          if (tmp_data) hypre_TFree(tmp_data, HYPRE_MEMORY_SHARED);
          hypre_VectorData(hypre_ParVectorLocalVector(U_array[level])) = &x_data[row_start];
+	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
+	 if (hypre_ParVectorLocalVector(U_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(U_array[level])) = 0;
+	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(U_array[level]));
+	 //printf("SIZEs %d %p %d \n",level,&x_data[row_start],hypre_ParVectorLocalVector(U_array[level])->size);
       }
       cnt_level++;
 
@@ -1028,7 +1123,7 @@ HYPRE_Int hypre_CreateDinv(void *amg_vdata)
    HYPRE_Int l1_start;
 
    /* Acquire data and allocate storage */
-
+   printf("THIS IS CALLED\n");
    A_array           = hypre_ParAMGDataAArray(amg_data);
    F_array           = hypre_ParAMGDataFArray(amg_data);
    U_array           = hypre_ParAMGDataUArray(amg_data);
@@ -1070,6 +1165,9 @@ HYPRE_Int hypre_CreateDinv(void *amg_vdata)
    r_data = hypre_VectorData(hypre_ParVectorLocalVector(Rtilde));
    D_inv = hypre_CTAlloc(HYPRE_Real,  num_rows_L, HYPRE_MEMORY_HOST);
 
+   hypre_SeqVectorMapToDevice(Xtilde_local);
+   hypre_SeqVectorMapToDevice(Rtilde_local);
+   //printRC(Xtilde_local,"IN DINV");
    l1_start = 0;
    for (level=addlvl; level < add_end; level++)
    {
@@ -1078,11 +1176,18 @@ HYPRE_Int hypre_CreateDinv(void *amg_vdata)
          tmp_data = hypre_VectorData(hypre_ParVectorLocalVector(F_array[level]));
          if (tmp_data) hypre_TFree(tmp_data, HYPRE_MEMORY_SHARED);
          hypre_VectorData(hypre_ParVectorLocalVector(F_array[level])) = &r_data[l1_start];
+	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
+	 if (hypre_ParVectorLocalVector(F_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(F_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(F_array[level])) = 0;
+	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(F_array[level]));
+
          tmp_data = hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]));
          if (tmp_data) hypre_TFree(tmp_data, HYPRE_MEMORY_SHARED);
          hypre_VectorData(hypre_ParVectorLocalVector(U_array[level])) = &x_data[l1_start];
+	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
+	 if (hypre_ParVectorLocalVector(U_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(U_array[level])) = 0;
+	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(U_array[level]));
       }
 
       A_tmp = A_array[level];

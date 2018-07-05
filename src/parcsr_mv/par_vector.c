@@ -458,7 +458,8 @@ hypre_VectorToParVector ( MPI_Comm      comm,
    hypre_MPI_Request  *requests;
    hypre_MPI_Status   *status, status0;
    HYPRE_Int           i, j, k, p;
-
+   
+   SyncVectorToHost(v);
    hypre_MPI_Comm_size(comm,&num_procs);
    hypre_MPI_Comm_rank(comm,&my_id);
 
@@ -524,7 +525,7 @@ hypre_VectorToParVector ( MPI_Comm      comm,
          hypre_MPI_Recv( local_data+j*vecstride, local_size, HYPRE_MPI_COMPLEX,
                          0, 0, comm,&status0 );
    }
-
+   UpdateHRC(local_vector);
    return par_vector;
 }
    
@@ -577,7 +578,7 @@ hypre_ParVectorToVectorAll( hypre_ParVector *par_v )
    HYPRE_Int start;
    
 #endif
-
+   SyncVectorToHost(local_vector);
    hypre_MPI_Comm_size(comm, &num_procs);
    hypre_MPI_Comm_rank(comm, &my_id);
 
@@ -836,7 +837,7 @@ hypre_ParVectorToVectorAll( hypre_ParVector *par_v )
    }
 
 #endif
-
+   UpdateHRC(vector);
    return vector;
 }
 
@@ -1085,7 +1086,22 @@ hypre_int hypre_ParVectorIsManaged(hypre_ParVector *vector){
 #endif
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
 void hypre_ParVectorUpdateHost(hypre_ParVector *p){
-#pragma omp target update from(p->local_vector->data[0:p->local_vector->size])
+#pragma omp target update from(p->local_vector->data[0:p->local_vector->size]) if (p->local_vector->size>0)
   SetHRC(p->local_vector);
 }
 #endif
+HYPRE_Int DiffHD( hypre_ParVector *A){
+  if (A==NULL) {
+    printf("NULL VECTOR\n");
+    return 0;
+  }
+  int mapped = hypre_ParVectorLocalVector(A)->mapped;
+  int HRC=hypre_ParVectorLocalVector(A)->hrc;
+  int DRC=hypre_ParVectorLocalVector(A)->drc;
+  HYPRE_Real HP = hypre_SeqVectorInnerProdHost(hypre_ParVectorLocalVector(A),hypre_ParVectorLocalVector(A));
+  HYPRE_Real DP = hypre_SeqVectorInnerProd(hypre_ParVectorLocalVector(A),hypre_ParVectorLocalVector(A));
+  if (fabs(DP-HP)>1.e-10){
+    printf("%d BOOM:: Copies of the data are different (%p) :: D=%g H=%g %g DRC = %d HRC = %d SIZE = %d value = %lf \n",mapped,hypre_ParVectorLocalVector(A),DP,HP,HP-DP,DRC,HRC,hypre_ParVectorLocalVector(A)->size,hypre_ParVectorLocalVector(A)->data[5]);
+  } else printf("%d All is well Value(%p) = %g Size = %d \n",mapped,hypre_ParVectorLocalVector(A), HP,hypre_ParVectorLocalVector(A)->size);
+  return 1;
+}

@@ -279,9 +279,12 @@ hypre_BoomerAMGCGRelaxWt( void              *amg_vdata,
       }
       else
       {
+	SyncVectorToHost(hypre_ParVectorLocalVector(Ptemp));
+	SyncVectorToHost(hypre_ParVectorLocalVector(Ztemp));
          beta = gamma/gammaold;
          for (i=0; i < local_size; i++)
             Ptemp_data[i] = Ztemp_data[i] + beta*Ptemp_data[i];
+	 UpdateHRC(hypre_ParVectorLocalVector(Ptemp));
       }
       hypre_ParCSRMatrixMatvec(1.0,A,Ptemp,0.0,Vtemp);
       alpha = gamma /hypre_ParVectorInnerProd(Ptemp,Vtemp);

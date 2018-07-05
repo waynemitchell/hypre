@@ -211,7 +211,7 @@ hypre__offload_flag: 0 == OK; 1 == WRONG
 */
 
 
-//#define TRACK_MEMORY_ALLOCATIONS
+#define TRACK_MEMORY_ALLOCATIONS
 #if defined(TRACK_MEMORY_ALLOCATIONS)
 
 typedef struct {
@@ -236,12 +236,16 @@ void assert_check(void *ptr, char *file, HYPRE_Int line);
 
 void assert_check_host(void *ptr, char *file, HYPRE_Int line);
 
-
+#if defined(HYPRE_USE_MANAGED)
 #define ASSERT_MANAGED(ptr)\
   ( assert_check((ptr),__FILE__,__LINE__))
 
 #define ASSERT_HOST(ptr)\
   ( assert_check_host((ptr),__FILE__,__LINE__))
+#else
+#define ASSERT_MANAGED(ptr)			
+#define ASSERT_HOST(ptr)
+#endif
 
 #else
 
@@ -294,11 +298,17 @@ void assert_check_host(void *ptr, char *file, HYPRE_Int line);
  *--------------------------------------------------------------------------*/
 
 /* hypre_memory.c */
-#if 0
+#if defined(TRACK_MEMORY_ALLOCATIONS)
 char *hypre_CAllocIns( size_t count ,  size_t elt_size , HYPRE_Int location,char *file, HYPRE_Int line);
 char *hypre_ReAllocIns( char *ptr ,  size_t size , HYPRE_Int location,char *file, HYPRE_Int line);
 char *hypre_MAllocIns( size_t size , HYPRE_Int location,char *file,HYPRE_Int line);
 char *hypre_MAllocPinned( size_t size );
+void * hypre_MAlloc(size_t size, HYPRE_Int location);
+void * hypre_CAlloc( size_t count, size_t elt_size, HYPRE_Int location);
+void * hypre_ReAlloc(void *ptr, size_t size, HYPRE_Int location);
+void   hypre_Memcpy(void *dst, void *src, size_t size, HYPRE_Int loc_dst, HYPRE_Int loc_src);
+void * hypre_Memset(void *ptr, HYPRE_Int value, size_t num, HYPRE_Int location);
+void   hypre_Free(void *ptr, HYPRE_Int location);
 #else
 void * hypre_MAlloc(size_t size, HYPRE_Int location);
 void * hypre_CAlloc( size_t count, size_t elt_size, HYPRE_Int location);

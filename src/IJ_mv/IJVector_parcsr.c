@@ -291,7 +291,7 @@ hypre_IJVectorZeroValuesPar(hypre_IJVector *vector)
 #endif
    for (i = 0; i < vec_stop - vec_start; i++)
       data[i] = 0.;
-  
+   
    return hypre_error_flag;
 }
 
@@ -437,7 +437,10 @@ hypre_IJVectorSetValuesPar(hypre_IJVector       *vector,
       for (j = 0; j < num_values; j++)
          data[j] = values[j];
    } 
-  
+   if (local_vector->hrc<=local_vector->drc) UpdateHRC(local_vector);
+  //printRC(local_vector,"IJ VECTOR");
+  //SyncVectorToDevice(local_vector);
+  //printf("IJ VECTPR UPDATED\n");
    return hypre_error_flag;
 }
 

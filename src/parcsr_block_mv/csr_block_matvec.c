@@ -44,6 +44,9 @@ hypre_CSRBlockMatrixMatvec(HYPRE_Complex alpha, hypre_CSRBlockMatrix *A,
    HYPRE_Int         ierr = 0;
    HYPRE_Complex     temp;
 
+
+   SyncVectorToHost(x);
+   SyncVectorToHost(y);
    /*---------------------------------------------------------------------
     *  Check for size compatibility.  Matvec returns ierr = 1 if
     *  length of X doesn't equal the number of columns of A,
@@ -133,7 +136,7 @@ hypre_CSRBlockMatrixMatvec(HYPRE_Complex alpha, hypre_CSRBlockMatrix *A,
       for (i = 0; i < num_rows*blk_size; i++)
          y_data[i] *= alpha;
    }
-
+   UpdateHRC(y);
    return ierr;
 }
 
@@ -172,6 +175,8 @@ hypre_CSRBlockMatrixMatvecT( HYPRE_Complex         alpha,
    
    HYPRE_Int         blk_size = hypre_CSRBlockMatrixBlockSize(A);
    HYPRE_Int         bnnz=blk_size*blk_size;
+   SyncVectorToHost(x);
+   SyncVectorToHost(y);
 
    /*---------------------------------------------------------------------
     *  Check for size compatibility.  MatvecT returns ierr = 1 if
@@ -269,7 +274,7 @@ hypre_CSRBlockMatrixMatvecT( HYPRE_Complex         alpha,
       for (i = 0; i < num_cols*blk_size; i++)
          y_data[i] *= alpha;
    }
-
+   UpdateHRC(y);
    return ierr;
 }
 

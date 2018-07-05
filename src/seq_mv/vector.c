@@ -23,6 +23,7 @@
 #include <cusparse.h>
 #include "gpukernels.h"
 #endif
+#include <omp.h>
 
 #define NUM_TEAMS 128
 #define NUM_THREADS 1024
@@ -123,8 +124,9 @@ hypre_SeqVectorInitialize( hypre_Vector *vector )
    }
    else
       ++ierr;
-#ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD   
-   UpdateHRC;
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
+   //printf("THIS IS CALLED\n");
+   //UpdateHRC(vector);
 #endif
    return ierr;
 }
@@ -288,6 +290,7 @@ hypre_SeqVectorSetConstantValues( hypre_Vector *v,
    size *=hypre_VectorNumVectors(v);
 #if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
    if (!v->mapped) hypre_SeqVectorMapToDevice(v);
+   SetDRC(v);
 #endif
 #ifdef HYPRE_USE_MANAGED
    hypre_SeqVectorPrefetchToDevice(v);
@@ -312,8 +315,8 @@ hypre_SeqVectorSetConstantValues( hypre_Vector *v,
    UpdateDRC(v);
    // 2 lines below required to get exact match with baseline
    // Not clear why this is the case.
-   SyncVectorToHost(v);
-   UpdateHRC(v);
+   //SyncVectorToHost(v);
+   //UpdateHRC(v);
 #endif  
    return ierr;
 }
@@ -341,7 +344,7 @@ hypre_SeqVectorSetRandomValues( hypre_Vector *v,
 /* RDF: threading this loop may cause problems because of hypre_Rand() */
    for (i = 0; i < size; i++)
       vector_data[i] = 2.0 * hypre_Rand() - 1.0;
-
+   UpdateHRC(v);
    return ierr;
 }
 
@@ -521,7 +524,7 @@ hypre_SeqVectorAxpy( HYPRE_Complex alpha,
    if (!x->mapped) hypre_SeqVectorMapToDevice(x);
    else SyncVectorToDevice(x);
    if (!y->mapped) hypre_SeqVectorMapToDevice(y);
-   else SyncVectorToHost(y);
+   else SyncVectorToDevice(y);
 #endif
 
 #ifdef HYPRE_USE_MANAGED
@@ -552,6 +555,11 @@ hypre_SeqVectorAxpy( HYPRE_Complex alpha,
 /*--------------------------------------------------------------------------
  * hypre_SeqVectorInnerProd
  *--------------------------------------------------------------------------*/
+int zcount(double *x, int size){
+  int c=0;
+  for(int i=0;i<size;i++) if (x[i]!=0.0) c++;
+  return c;
+}
 
 HYPRE_Real   hypre_SeqVectorInnerProd( hypre_Vector *x,
                                        hypre_Vector *y )
@@ -562,13 +570,45 @@ HYPRE_Real   hypre_SeqVectorInnerProd( hypre_Vector *x,
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_BLAS1] -= hypre_MPI_Wtime();
 #endif
-
+   //printf("(%d %d),(%d %d) PRE \n",x->hrc,x->drc,y->hrc,y->drc);
 #if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
    if (!x->mapped) hypre_SeqVectorMapToDevice(x);
    else SyncVectorToDevice(x);
    if (!y->mapped) hypre_SeqVectorMapToDevice(y);
-   else SyncVectorToHost(y);
+   else SyncVectorToDevice(y);
 #endif
+
+   HYPRE_Complex *x_data = hypre_VectorData(x);
+   HYPRE_Complex *y_data = hypre_VectorData(y);
+   HYPRE_Int      size   = hypre_VectorSize(x);
+           
+   HYPRE_Int      i;
+
+   HYPRE_Real     result = 0.0;
+   //ASSERT_MANAGED(x_data);
+   //ASSERT_MANAGED(y_data);
+   //printf("(%d %d),(%d %d),Inner %d %d %lf %lf \n",x->hrc,x->drc,y->hrc,y->drc,zcount(x_data,size),zcount(y_data,size),x_data[10],y_data[10]);
+   PUSH_RANGE("INNER_PROD",0);
+   size *=hypre_VectorNumVectors(x);
+#if defined(HYPRE_USING_OPENMP_OFFLOAD)
+#pragma omp target teams  distribute  parallel for private(i) num_teams(NUM_TEAMS) thread_limit(NUM_THREADS) reduction(+:result) is_device_ptr(y_data,x_data) map(tofrom:result)
+#elif defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
+#pragma omp target teams  distribute  parallel for private(i) num_teams(NUM_TEAMS) thread_limit(1) reduction(+:result)  map(tofrom:result)
+#elif defined(HYPRE_USING_OPENMP)
+#pragma omp parallel for private(i) reduction(+:result) HYPRE_SMP_SCHEDULE
+#endif
+   for (i = 0; i < size; i++)
+     result += hypre_conj(y_data[i]) * x_data[i];
+   POP_RANGE;
+#ifdef HYPRE_PROFILE
+   hypre_profile_times[HYPRE_TIMER_ID_BLAS1] += hypre_MPI_Wtime();
+#endif
+
+   return result;
+}
+HYPRE_Real   hypre_SeqVectorInnerProdHost( hypre_Vector *x,
+                                       hypre_Vector *y )
+{
 
 
    HYPRE_Complex *x_data = hypre_VectorData(x);
@@ -580,13 +620,10 @@ HYPRE_Real   hypre_SeqVectorInnerProd( hypre_Vector *x,
    HYPRE_Real     result = 0.0;
    //ASSERT_MANAGED(x_data);
    //ASSERT_MANAGED(y_data);
+   //printf("(%d %d),(%d %d),Inner %d %d %lf %lf \n",x->hrc,x->drc,y->hrc,y->drc,zcount(x_data,size),zcount(y_data,size),x_data[10],y_data[10]);
    PUSH_RANGE("INNER_PROD",0);
    size *=hypre_VectorNumVectors(x);
-#if defined(HYPRE_USING_OPENMP_OFFLOAD)
-#pragma omp target teams  distribute  parallel for private(i) num_teams(NUM_TEAMS) thread_limit(NUM_THREADS) reduction(+:result) is_device_ptr(y_data,x_data) map(result)
-#elif defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
-#pragma omp target teams  distribute  parallel for private(i) num_teams(NUM_TEAMS) thread_limit(NUM_THREADS) reduction(+:result)  map(result)
-#elif defined(HYPRE_USING_OPENMP)
+#if defined(HYPRE_USING_OPENMP)
 #pragma omp parallel for private(i) reduction(+:result) HYPRE_SMP_SCHEDULE
 #endif
    for (i = 0; i < size; i++)
@@ -766,9 +803,26 @@ hypre_int hypre_SeqVectorIsManaged(hypre_Vector *x){
 void hypre_SeqVectorMapToDevice(hypre_Vector *x){
   if (x==NULL) return;
   if (x->size>0){
+    /* if (omp_target_is_present(x->data,0)) {  */
+    /*   printf("WARNING :: Trying to map mapped region %p\n",x->data); */
+    /*   pattr_t *s = patpush(x->data,NULL); */
+    /*   printf("Original allocation from %s %d \n",s->file,s->line); */
+    /* } */
     //#pragma omp target enter data map(to:x[0:0])
+    //if ( hypre_VectorOwnsData(x)){
+    if (omp_target_is_present(x->data,0)) { printf("WARNING :: Trying to map mapped region\n");}
+    if (x->data==NULL) hypre_printf("ERROR:: MAPPING NULL VECTOR OF SIZE %d\n",x->size);
+#define ALLOCMAP 1
+#ifdef ALLOCMAP
+#pragma omp target enter data map(alloc:x->data[0:x->size])
+#pragma omp target update to(x->data[0:x->size]) 
+#else
 #pragma omp target enter data map(to:x->data[0:x->size])
+#endif
+      //}
     x->mapped=1;
+    x->pcopy=x->data;
+    //if (omp_target_is_present(x->data,0)) printf("Successfully mapped region %p %p\n",x->data,x->data+x->size);
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
     SetDRC(x);
 #endif
@@ -778,7 +832,7 @@ void hypre_SeqVectorMapToDevicePrint(hypre_Vector *x){
   printf("SVmap %p [%p,%p] %d Size = %d ",x,x->data,x->data+x->size,x->mapped,x->size);
   if (x->size>0){
     //#pragma omp target enter data map(to:x[0:0])
-#pragma omp target enter data map(to:x->data[0:x->size])
+#pragma omp target enter data map(alloc:x->data[0:x->size]) 
   x->mapped=1;
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
   SetDRC(x);
@@ -790,25 +844,98 @@ void hypre_SeqVectorMapToDevicePrint(hypre_Vector *x){
 void hypre_SeqVectorUnMapFromDevice(hypre_Vector *x){
   //printf("map %p [%p,%p] %d Size = %d\n",x,x->data,x->data+x->size,x->mapped,x->size);
   //#pragma omp target exit data map(from:x[0:0])
-#pragma omp target exit data map(from:x->data[0:x->size])
+  //if ( hypre_VectorOwnsData(x)){
+
+// This should be a delet
+#ifdef ALLOCMAP
+#pragma omp target exit data map(delete:x->data[0:x->size])  if (x->size>0)
+#else
+#pragma omp target exit data map(from:x->data[0:x->size])  if (x->size>0)
+#endif
+  /* if (omp_target_is_present(x->data,0)) {  */
+  /*   printf("WARNING :: Unmapped region still shows as mapped region %p\n",x->data); */
+  /*   pattr_t *s = patpush(x->data,NULL); */
+  /*   printf("Original allocation from %s %d \n",s->file,s->line); */
+  /* } */
+  //}
   x->mapped=0;
 }
 void hypre_SeqVectorUpdateDevice(hypre_Vector *x){
   if (x==NULL) return;
-#pragma omp target update to(x->data[0:x->size])
+  if (!x->mapped) {
+     return;
+     hypre_printf("ERROR:: Updating to devie from unmapped vector\n");
+    double *gah=NULL; *gah = -sqrt(-1.0);
+    hypre_printf("GAH %g \n",*gah);
+    hypre_SeqVectorMapToDevice(x);
+}
+  if (x->pcopy!=x->data) {
+    hypre_printf("WARNING UPDATE DEVICE :: Host pointer has changed since intial map\n");
+    pattr_t *s=patpush(x->pcopy,NULL);
+    hypre_printf("Original %p from %s %d \n",x->pcopy,s->file,s->line);
+    s=patpush(x->data,NULL);
+    hypre_printf("Current %p from %s %d \n",x->data,s->file,s->line);
+    double *gah=NULL; *gah = -sqrt(-1.0);
+    hypre_printf("GAH %g \n",*gah);
+  }
+#pragma omp target update to(x->data[0:x->size]) if (x->size>0)
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
   SetDRC(x);
 #endif
 }
 
 void hypre_SeqVectorUpdateHost(hypre_Vector *x){
-  if (x==NULL) return;
-#pragma omp target update from(x->data[0:x->size])
-#ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
+   if (x==NULL) return; 
+   if (!x->mapped) {
+     return;
+     hypre_printf("ERROR:: Updating to host from unmapped vector\n");
+     pattr_t *s=patpush(x->data,NULL);
+     hypre_printf("Vec data  %p from %s %d \n",x->data,s->file,s->line);
+     s=patpush(x,NULL);
+     hypre_printf("Vector  %p from %s %d \n",x,s->file,s->line);
+    //double *gah=NULL; *gah = -sqrt(-1.0);
+    //hypre_printf("GAH %g \n",*gah);
+  }
+   if (x->pcopy!=x->data) {
+     hypre_printf("ERROR :: UPDATE DEVICE :: Host pointer has changed since intial map\n");
+     pattr_t *s=patpush(x->pcopy,NULL);
+    hypre_printf("Original %p from %s %d \n",x->pcopy,s->file,s->line);
+    s=patpush(x->data,NULL);
+    hypre_printf("Current %p from %s %d \n",x->data,s->file,s->line);
+    double *gah=NULL; *gah = -sqrt(-1.0);
+    hypre_printf("GAH %g \n",*gah);
+  }
+   /* This a a fix for the intermittent failure of the pragma update for the elast.6 problem
+      in TEST_ij.
+   */
+  omp_target_memcpy(x->data,get_device_pointer(x->data),
+  		    x->size*sizeof(double),0,0,
+  		    omp_get_initial_device(),0);
+  
   SetHRC(x);
-#endif
+  return;
+
+  /* for (int i=0;i<x->size;i++){  */
+  /*    #pragma omp target update from(x->data[i:1])  */
+  /*  } */
+  /*    SetHRC(x); */
+   // return;
+
+#pragma omp target update from(x->data[0:x->size]) 
+  SetHRC(x);
 }
 void printRC(hypre_Vector *x,char *id){
   printf("%p At %s HRC = %d , DRC = %d \n",x,id,x->hrc,x->drc);
 }
+HYPRE_Complex *get_device_pointer_actual(HYPRE_Complex *ptr){
+  return ptr;
+}
+HYPRE_Complex *get_device_pointer(HYPRE_Complex *ptr){
+  HYPRE_Complex *retval;
+#pragma omp target data use_device_ptr(ptr) 
+  retval = get_device_pointer_actual(ptr);
+  return retval;
+}
+
 #endif
+

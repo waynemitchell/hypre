@@ -636,7 +636,7 @@ HYPRE_Int  hypre_BoomerAMGRelaxT( hypre_ParCSRMatrix *A,
     *     relax_type = 7 -> Jacobi (uses ParMatvec)
     *     relax_type = 9 -> Direct Solve
     *-----------------------------------------------------------------------*/
-   
+   //printf("Relax_type in par_amg_solveT.c %d \n",relax_type);
    switch (relax_type)
    {            
 
@@ -652,8 +652,9 @@ HYPRE_Int  hypre_BoomerAMGRelaxT( hypre_ParCSRMatrix *A,
          /*-----------------------------------------------------------------
           * Perform MatvecT Vtemp=f-A^Tu
           *-----------------------------------------------------------------*/
- 
+	 
             hypre_ParCSRMatrixMatvecT(-1.0,A, u, 1.0, Vtemp);
+	    SyncVectorToHost(u_local);
             for (i = 0; i < n; i++)
             {
  
@@ -667,6 +668,7 @@ HYPRE_Int  hypre_BoomerAMGRelaxT( hypre_ParCSRMatrix *A,
 				/ A_diag_data[A_diag_i[i]];
                }
             }
+	    UpdateHRC(u_local);
       }
       break;
       
@@ -693,7 +695,7 @@ HYPRE_Int  hypre_BoomerAMGRelaxT( hypre_ParCSRMatrix *A,
             /*---------------------------------------------------------------
              *  Load transpose of CSR matrix into A_mat.
              *---------------------------------------------------------------*/
-
+	    
             for (i = 0; i < n_global; i++)
             {
                for (jj = A_CSR_i[i]; jj < A_CSR_i[i+1]; jj++)

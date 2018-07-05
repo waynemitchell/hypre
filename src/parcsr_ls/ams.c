@@ -62,6 +62,7 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
    HYPRE_Real *f_data = hypre_VectorData(hypre_ParVectorLocalVector(f));
    HYPRE_Real *v_data = hypre_VectorData(hypre_ParVectorLocalVector(v));
    //printRC(hypre_ParVectorLocalVector(u),"STarting....");
+   //printf("hypre_ParCSRRelax( relax_type is %d \n",relax_type);
    for (sweep = 0; sweep < relax_times; sweep++)
    {
       if (relax_type == 1) /* l1-scaled Jacobi */
@@ -139,10 +140,15 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
 
          HYPRE_Int num_procs;
          hypre_MPI_Comm_size(hypre_ParCSRMatrixComm(A), &num_procs);
-
+	 
+	 SyncVectorToHost(hypre_ParVectorLocalVector(u));
+	 SyncVectorToHost(hypre_ParVectorLocalVector(f));
+	 
          /* Copy off-diagonal values of u to the current processor */
          if (num_procs > 1)
          {
+
+	   
             hypre_ParCSRCommPkg *comm_pkg = hypre_ParCSRMatrixCommPkg(A);
             HYPRE_Int num_sends;
             HYPRE_Real *u_buf_data;
@@ -262,7 +268,8 @@ HYPRE_Int hypre_ParCSRRelax(/* matrix to relax with */
                u_data[i] += (c1 * res + c2 * dif) / l1_norms[i];
             }
          }
-
+	 UpdateHRC(hypre_ParVectorLocalVector(u));
+	 SyncVectorToDevice(hypre_ParVectorLocalVector(u));
          hypre_TFree(u_offd_data, HYPRE_MEMORY_HOST);
       }
       else if (relax_type == 3) /* Kaczmarz */
@@ -423,6 +430,8 @@ HYPRE_Int hypre_ParVectorBlockSplit(hypre_ParVector *x,
 {
    HYPRE_Int i, d, size_;
    HYPRE_Real *x_data, *x_data_[3];
+   // This should be moved to device : 2nd tests in TEST_ams(run2)
+    SyncVectorToHost(hypre_ParVectorLocalVector(x));
 
    size_ = hypre_VectorSize(hypre_ParVectorLocalVector(x_[0]));
 
@@ -434,6 +443,12 @@ HYPRE_Int hypre_ParVectorBlockSplit(hypre_ParVector *x,
       for (d = 0; d < dim; d++)
          x_data_[d][i] = x_data[dim*i+d];
 
+
+   for (d = 0; d < dim; d++){
+     UpdateHRC(hypre_ParVectorLocalVector(x_[d]));
+     //printRC(hypre_ParVectorLocalVector(x_[d]),"IN hypre_ParVectorBlockSplit(");
+     SyncVectorToDevice(hypre_ParVectorLocalVector(x_[d]));
+   }
    return hypre_error_flag;
 }
 
@@ -451,6 +466,10 @@ HYPRE_Int hypre_ParVectorBlockGather(hypre_ParVector *x,
    HYPRE_Int i, d, size_;
    HYPRE_Real *x_data, *x_data_[3];
 
+   // This should be moved to device : 2nd tests in TEST_ams(run2)
+   for (d = 0; d < dim; d++)
+     SyncVectorToHost(hypre_ParVectorLocalVector(x_[d]));
+   
    size_ = hypre_VectorSize(hypre_ParVectorLocalVector(x_[0]));
 
    x_data = hypre_VectorData(hypre_ParVectorLocalVector(x));
@@ -461,6 +480,8 @@ HYPRE_Int hypre_ParVectorBlockGather(hypre_ParVector *x,
       for (d = 0; d < dim; d++)
          x_data[dim*i+d] = x_data_[d][i];
 
+   UpdateHRC(hypre_ParVectorLocalVector(x));
+   SyncVectorToDevice(hypre_ParVectorLocalVector(x));
    return hypre_error_flag;
 }
 
@@ -495,7 +516,7 @@ HYPRE_Int hypre_BoomerAMGBlockSolve(void *B,
       b_[d] = hypre_ParVectorInRangeOf(A);
       x_[d] = hypre_ParVectorInRangeOf(A);
    }
-
+   
    hypre_ParVectorBlockSplit(b, b_, dim);
    hypre_ParVectorBlockSplit(x, x_, dim);
 
@@ -978,7 +999,7 @@ HYPRE_Int hypre_AMSDestroy(void *solver)
       hypre_ParCSRMatrixDestroy(ams_data -> A_G0);
    if (ams_data -> B_G0)
       HYPRE_BoomerAMGDestroy(ams_data -> B_G0);
-
+   //printf("AMS FREEING %p",ams_data -> A_l1_norms);
    if (ams_data -> A_l1_norms)
       hypre_TFree(ams_data -> A_l1_norms, HYPRE_MEMORY_SHARED);
 
@@ -2179,10 +2200,13 @@ HYPRE_Int hypre_AMSSetup(void *solver,
          hypre_ParCSRMatrixMatvec (1.0, ams_data -> G, ams_data -> x, 0.0, ams_data -> Gx);
          ams_data -> Gy = hypre_ParVectorInRangeOf(ams_data -> G);
          hypre_ParCSRMatrixMatvec (1.0, ams_data -> G, ams_data -> y, 0.0, ams_data -> Gy);
+	 SyncVectorToHost(hypre_ParVectorLocalVector(ams_data -> Gx));
+	 SyncVectorToHost(hypre_ParVectorLocalVector(ams_data -> Gy));
          if (ams_data -> dim == 3)
          {
             ams_data -> Gz = hypre_ParVectorInRangeOf(ams_data -> G);
             hypre_ParCSRMatrixMatvec (1.0, ams_data -> G, ams_data -> z, 0.0, ams_data -> Gz);
+	    SyncVectorToHost(hypre_ParVectorLocalVector(ams_data -> Gz));
          }
       }
    }
@@ -3591,7 +3615,7 @@ HYPRE_Int hypre_ParCSRComputeL1NormsThreads(hypre_ParCSRMatrix *A,
    *l1_norm_ptr = l1_norm;
 
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
-#pragma omp target enter data map(to:l1_norm[0:num_rows])
+#pragma omp target enter data map(to:l1_norm[0:num_rows])  if (num_rows>0)
 #endif
    return hypre_error_flag;
 }

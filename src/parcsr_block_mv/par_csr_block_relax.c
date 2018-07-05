@@ -202,6 +202,7 @@ HYPRE_Int  hypre_BoomerAMGBlockRelax( hypre_ParCSRBlockMatrix *A,
     *                         with outer relaxation paramete
     *     relax_type = 29 -> Direct Solve
     *-----------------------------------------------------------------------*/
+   //hypre_printf("hypre_BoomerAMGBlockRelax relax_type = %d\n",relax_type);
    switch (relax_type)
    {            
 
@@ -371,6 +372,8 @@ HYPRE_Int  hypre_BoomerAMGBlockRelax( hypre_ParCSRBlockMatrix *A,
   ---------------------------------------------------------------------------*/
       case 23: 
       {
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
          if (num_procs > 1)
          {
             num_sends = hypre_ParCSRCommPkgNumSends(comm_pkg);
@@ -984,7 +987,7 @@ HYPRE_Int  hypre_BoomerAMGBlockRelax( hypre_ParCSRBlockMatrix *A,
             hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
          }
          
-
+	 UpdateHRC(u_local);
          break;
       }
 
@@ -998,7 +1001,8 @@ HYPRE_Int  hypre_BoomerAMGBlockRelax( hypre_ParCSRBlockMatrix *A,
 
       case 26: 
       {
-
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
          if (num_procs > 1)
          {
             num_sends = hypre_ParCSRCommPkgNumSends(comm_pkg);
@@ -2026,6 +2030,8 @@ HYPRE_Int  hypre_BoomerAMGBlockRelax( hypre_ParCSRBlockMatrix *A,
             hypre_TFree(Vext_data, HYPRE_MEMORY_HOST);
             hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
          }
+	 UpdateHRC(u_local);
+	 SyncVectorToDevice(u_local);
          break;
       }
    
@@ -2058,6 +2064,8 @@ HYPRE_Int  hypre_BoomerAMGBlockRelax( hypre_ParCSRBlockMatrix *A,
             A_CSR = hypre_ParCSRMatrixToCSRMatrixAll(A_ParCSR);
             f_vector = hypre_ParVectorToVectorAll(f);
 #endif
+	    SyncVectorToHost(f_vector);
+	    SyncVectorToHost(u_local);
             A_CSR_i = hypre_CSRMatrixI(A_CSR);
             A_CSR_j = hypre_CSRMatrixJ(A_CSR);
             A_CSR_data = hypre_CSRMatrixData(A_CSR);
@@ -2111,7 +2119,7 @@ HYPRE_Int  hypre_BoomerAMGBlockRelax( hypre_ParCSRBlockMatrix *A,
 
          hypre_ParCSRMatrixDestroy(A_ParCSR);
          A_ParCSR = NULL;
-
+	 UpdateHRC(u_local);
          break;
       }
       

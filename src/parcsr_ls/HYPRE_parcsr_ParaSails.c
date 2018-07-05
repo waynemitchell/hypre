@@ -165,9 +165,14 @@ HYPRE_ParCSRParaSailsSolve( HYPRE_Solver solver,
 
    rhs  = hypre_VectorData(hypre_ParVectorLocalVector((hypre_ParVector *) b));
    soln = hypre_VectorData(hypre_ParVectorLocalVector((hypre_ParVector *) x));
-
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
+   SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) b));
+   SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) x));
+#endif
    hypre_ParaSailsApply(secret->obj, rhs, soln);
-
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
+   UpdateHRC(hypre_ParVectorLocalVector((hypre_ParVector *) x));
+#endif
    return hypre_error_flag;
 }
 
@@ -401,12 +406,18 @@ HYPRE_ParaSailsSolve( HYPRE_Solver solver,
 {
    HYPRE_Real *rhs, *soln;
    Secret *secret = (Secret *) solver;
-
+   
    rhs  = hypre_VectorData(hypre_ParVectorLocalVector((hypre_ParVector *) b));
    soln = hypre_VectorData(hypre_ParVectorLocalVector((hypre_ParVector *) x));
 
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
+   SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) b));
+   SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) x));
+#endif
+
    hypre_ParaSailsApply(secret->obj, rhs, soln);
 
+   UpdateHRC(hypre_ParVectorLocalVector((hypre_ParVector *) x));
    return hypre_error_flag;
 }
 

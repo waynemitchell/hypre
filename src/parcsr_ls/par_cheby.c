@@ -227,15 +227,17 @@ HYPRE_Int hypre_ParCSRRelax_Cheby_Solve(hypre_ParCSRMatrix *A, /* matrix to rela
       /* get residual: r = f - A*u */
       hypre_ParVectorCopy(f, r); 
       hypre_ParCSRMatrixMatvec(-1.0, A, u, 1.0, r);
-
+      SyncVectorToHost(hypre_ParVectorLocalVector(r));
       for ( i = 0; i < num_rows; i++ ) 
       {
          orig_u[i] = u_data[i];
          u_data[i] = r_data[i] * coefs[cheby_order]; 
       }
+      UpdateHRC(hypre_ParVectorLocalVector(u));
       for (i = cheby_order - 1; i >= 0; i-- ) 
       {
          hypre_ParCSRMatrixMatvec(1.0, A, u, 0.0, v);
+	 SyncVectorToHost(hypre_ParVectorLocalVector(v));
          mult = coefs[i];
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(j) HYPRE_SMP_SCHEDULE 
@@ -244,6 +246,7 @@ HYPRE_Int hypre_ParCSRRelax_Cheby_Solve(hypre_ParCSRMatrix *A, /* matrix to rela
          {
             u_data[j] = mult * r_data[j] + v_data[j];
          }
+	 UpdateHRC(hypre_ParVectorLocalVector(u));
       }
 
 #ifdef HYPRE_USING_OPENMP
@@ -253,10 +256,11 @@ HYPRE_Int hypre_ParCSRRelax_Cheby_Solve(hypre_ParCSRMatrix *A, /* matrix to rela
       {
          u_data[i] = orig_u[i] + u_data[i];
       }
+      UpdateHRC(hypre_ParVectorLocalVector(u));
    }
    else /* scaling! */
    {
-      
+
       /*grab 1/sqrt(diagonal) */
       
       tmp_vec = hypre_ParVectorCreate(hypre_ParCSRMatrixComm(A),
@@ -268,8 +272,9 @@ HYPRE_Int hypre_ParCSRRelax_Cheby_Solve(hypre_ParCSRMatrix *A, /* matrix to rela
 
     /* get ds_data and get scaled residual: r = D^(-1/2)f -
        * D^(-1/2)A*u */
-
+      SyncVectorToHost(hypre_ParVectorLocalVector(f));
       hypre_ParCSRMatrixMatvec(-1.0, A, u, 0.0, tmp_vec);
+      SyncVectorToHost(hypre_ParVectorLocalVector(tmp_vec));
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(j) HYPRE_SMP_SCHEDULE 
 #endif
@@ -277,10 +282,10 @@ HYPRE_Int hypre_ParCSRRelax_Cheby_Solve(hypre_ParCSRMatrix *A, /* matrix to rela
       {
          r_data[j] = ds_data[j] * (f_data[j] + tmp_data[j]);
       }
-
+      UpdateHRC(hypre_ParVectorLocalVector(r));
       /* save original u, then start 
          the iteration by multiplying r by the cheby coef.*/
-
+      SyncVectorToHost(hypre_ParVectorLocalVector(u));
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(j) HYPRE_SMP_SCHEDULE 
 #endif
@@ -302,8 +307,9 @@ HYPRE_Int hypre_ParCSRRelax_Cheby_Solve(hypre_ParCSRMatrix *A, /* matrix to rela
          {
             tmp_data[j]  =  ds_data[j] * u_data[j];
          }
+	 UpdateHRC(hypre_ParVectorLocalVector(tmp_vec));
          hypre_ParCSRMatrixMatvec(1.0, A, tmp_vec, 0.0, v);
-
+	 SyncVectorToHost(hypre_ParVectorLocalVector(v));
          /* u_new = coef*r + v*/
          mult = coefs[i];
 
@@ -326,7 +332,7 @@ HYPRE_Int hypre_ParCSRRelax_Cheby_Solve(hypre_ParCSRMatrix *A, /* matrix to rela
       {
          u_data[j] = orig_u[j] + ds_data[j]*u_data[j];
       }
-   
+      UpdateHRC(hypre_ParVectorLocalVector(u));
       hypre_ParVectorDestroy(tmp_vec);  
 
    }/* end of scaling code */

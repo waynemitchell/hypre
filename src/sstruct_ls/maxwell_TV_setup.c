@@ -474,8 +474,10 @@ hypre_MaxwellTV_Setup(void                 *maxwell_vdata,
    hypre_SStructVectorConvert(x_in, &parvector_x);
    /*HYPRE_SStructVectorGetObject((HYPRE_SStructVector) x_in, (void **) &parvector_x);*/
    HYPRE_SStructVectorGetObject((HYPRE_SStructVector) xn, (void **) &parvector_b);
+   //UpdateHRC(hypre_ParVectorLocalVector(parvector_b));
+   //UpdateHRC(hypre_ParVectorLocalVector(parvector_x));
    hypre_ParCSRMatrixMatvec(1.0, T_transpose, parvector_x, 0.0, parvector_b);
-
+   SyncVectorToHost(hypre_ParVectorLocalVector(parvector_b));
    /* Destroy the node grid and graph. This only decrements reference counters. */
    HYPRE_SStructGridDestroy(node_grid);
    HYPRE_SStructGraphDestroy(node_graph);

@@ -253,12 +253,27 @@ HYPRE_ParCSRDiagScale( HYPRE_Solver solver,
    HYPRE_Int *A_i = hypre_CSRMatrixI(hypre_ParCSRMatrixDiag(A));
    HYPRE_Int local_size = hypre_VectorSize(hypre_ParVectorLocalVector(x));
    HYPRE_Int i, ierr = 0;
-
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
+   hypre_CSRMatrix *AD= hypre_ParCSRMatrixDiag(A);
+    if (AD->mapped==-1) {
+      hypre_CSRMatrixMapToDevice(AD);
+      hypre_CSRMatrixUpdateToDevice(AD);
+    }
+  hypre_Vector *x_vector = hypre_ParVectorLocalVector(x);
+  hypre_Vector *y_vector = hypre_ParVectorLocalVector(y);
+  if (!x_vector->mapped) hypre_SeqVectorMapToDevice(x_vector);
+   else SyncVectorToDevice(x_vector);
+  if (!y_vector->mapped) hypre_SeqVectorMapToDevice(y_vector);
+   else SyncVectorToDevice(y_vector);
+#pragma omp target teams  distribute  parallel for private(i) thread_limit(1024)
+#endif
    for (i=0; i < local_size; i++)
    {
       x_data[i] = y_data[i]/A_data[A_i[i]];
    } 
- 
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
+   UpdateDRC(x_vector);
+#endif
    return ierr;
 }
 

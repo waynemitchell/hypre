@@ -47,7 +47,7 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 #endif
 #endif
 
-#ifdef HYPRE_USING_OPENMP_OFFLOAD
+#if defined(HYPRE_USING_OPENMP_OFFLOAD) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
    PUSH_RANGE_PAYLOAD("MATVEC-OMP",0, hypre_CSRMatrixNumRows(A));
    HYPRE_Int ret=hypre_CSRMatrixMatvecOutOfPlaceOOMP( alpha,A,x,beta,b,y,offset);
    POP_RANGE;
@@ -504,7 +504,8 @@ hypre_CSRMatrixMatvecT( HYPRE_Complex    alpha,
     *  these conditions terminates processing, and the ierr flag
     *  is informational only.
     *--------------------------------------------------------------------*/
-
+   SyncVectorToHost(x);
+   SyncVectorToHost(y);
    hypre_assert( num_vectors == hypre_VectorNumVectors(y) );
  
    if (num_rows != x_size)
@@ -666,7 +667,8 @@ hypre_CSRMatrixMatvecT( HYPRE_Complex    alpha,
    }
 
    if (x == y) hypre_SeqVectorDestroy(x_tmp);
-
+   UpdateHRC(y);
+   SyncVectorToDevice(y);
    return ierr;
 }
 

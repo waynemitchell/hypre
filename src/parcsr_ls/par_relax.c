@@ -122,10 +122,14 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
     *     relax_type = 29-> Direct solve: use gaussian elimination & BLAS 
     *			    (with pivoting) (old version)
     *-----------------------------------------------------------------------*/
+   //if ((relax_type!=13) && (relax_type!=14) && (relax_type!=6)) hypre_printf("hypre_BoomerAMGRelax relax_type = %d\n",relax_type);
+   //hypre_printf("hypre_BoomerAMGRelax relax_type = %d\n",relax_type);
    switch (relax_type)
    {
       case 0: /* Weighted Jacobi */
       {
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
 	if (num_procs > 1)
 	{
    	num_sends = hypre_ParCSRCommPkgNumSends(comm_pkg);
@@ -247,6 +251,8 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
 	 hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
          }
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
 
       case 5: /* Hybrid: Jacobi off-processor, 
@@ -367,7 +373,8 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
                          Gauss-Seidel on-processor       
                          (forward loop) */
       {
-
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
          if (num_threads > 1)
          {
             Ztemp_local = hypre_ParVectorLocalVector(Ztemp);
@@ -860,6 +867,8 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
         hypre_profile_times[HYPRE_TIMER_ID_RELAX] += hypre_MPI_Wtime();
 #endif
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
 
       case 1: /* Gauss-Seidel VERY SLOW */
@@ -1007,6 +1016,8 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
       case 2: /* Gauss-Seidel: relax interior points in parallel, boundary
 				sequentially */
       {
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
 	if (num_procs > 1)
 	{
    	num_sends = hypre_ParCSRCommPkgNumSends(comm_pkg);
@@ -1193,12 +1204,16 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
  hypre_TFree(requests, HYPRE_MEMORY_HOST);
 	}
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
 
       case 4: /* Hybrid: Jacobi off-processor, 
                          Gauss-Seidel/SOR on-processor 
                          (backward loop) */
       {
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
 	if (num_procs > 1)
 	{
    	num_sends = hypre_ParCSRCommPkgNumSends(comm_pkg);
@@ -1644,13 +1659,17 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
 	   hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
          }
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
 
       case 6: /* Hybrid: Jacobi off-processor, 
                          Symm. Gauss-Seidel/ SSOR on-processor
 			with outer relaxation parameter */
       {
-
+	//printRC(u_local,"IN PAR_RELAX.C");
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
          if (num_threads > 1)
          {
             Ztemp_local = hypre_ParVectorLocalVector(Ztemp);
@@ -2348,6 +2367,8 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
 	   hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
         }
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
 
       case 7: /* Jacobi (uses ParMatvec) */
@@ -2386,7 +2407,8 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
 
       case 8: /* hybrid L1 Symm. Gauss-Seidel */
       {
-
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
          if (num_threads > 1)
          {
             Ztemp_local = hypre_ParVectorLocalVector(Ztemp);
@@ -3084,11 +3106,15 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
            hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
         }
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
-
       case 13: /* hybrid L1 Gauss-Seidel forward solve */
       {
-
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
+	//#pragma omp target update from(l1_norms[0:n])
+	//if (omp_target_is_present(l1_norms,0)) hypre_printf("L1NORMS is MAPPED %p \n",l1_norms);
          if (num_threads > 1)
          {
             Ztemp_local = hypre_ParVectorLocalVector(Ztemp);
@@ -3544,11 +3570,15 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
            hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
         }
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
 
       case 14: /* hybrid L1 Gauss-Seidel backward solve */
       {
-
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
+	//#pragma omp target update from(l1_norms[0:n])
          if (num_threads > 1)
          {
             Ztemp_local = hypre_ParVectorLocalVector(Ztemp);
@@ -4004,8 +4034,9 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
            hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
         }
       }
+      UpdateHRC(u_local);
+      SyncVectorToDevice(u_local);
       break;
-
       case 19: /* Direct solve: use gaussian elimination */
       {
 
@@ -4270,11 +4301,11 @@ HYPRE_Int hypre_GaussElimSolve (hypre_ParAMGData *amg_data, HYPRE_Int level, HYP
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_GS_ELIM_SOLVE] -= hypre_MPI_Wtime();
 #endif
-
+ 
    hypre_ParCSRMatrix *A = hypre_ParAMGDataAArray(amg_data)[level];
    HYPRE_Int  n        = hypre_CSRMatrixNumRows(hypre_ParCSRMatrixDiag(A));
    HYPRE_Int  error_flag = 0;
-
+   //printf("GAUSS ELIM %d\n",relax_type);
    if (n)
    {
       MPI_Comm new_comm = hypre_ParAMGDataNewComm(amg_data);
@@ -4291,14 +4322,15 @@ HYPRE_Int hypre_GaussElimSolve (hypre_ParAMGData *amg_data, HYPRE_Int level, HYP
       HYPRE_Int new_num_procs, i, my_info;
       HYPRE_Int first_index = hypre_ParCSRMatrixFirstRowIndex(A);
       HYPRE_Int one_i = 1;
-
+      SyncVectorToHost(hypre_ParVectorLocalVector(f));
+      SyncVectorToHost(hypre_ParVectorLocalVector(u));
+      //printf("GAUSS ELIM %d %d \n",relax_type, omp_target_is_present(b_vec,0));
       hypre_MPI_Comm_size(new_comm, &new_num_procs);
       info = &comm_info[0];
       displs = &comm_info[new_num_procs];
       hypre_MPI_Allgatherv ( f_data, n, HYPRE_MPI_REAL,
                           b_vec, info, displs,
                           HYPRE_MPI_REAL, new_comm );
-
       A_tmp = hypre_CTAlloc(HYPRE_Real,  n_global*n_global, HYPRE_MEMORY_HOST);
       for (i=0; i < n_global*n_global; i++)
          A_tmp[i] = A_mat[i];
@@ -4324,6 +4356,9 @@ HYPRE_Int hypre_GaussElimSolve (hypre_ParAMGData *amg_data, HYPRE_Int level, HYP
       {
          u_data[i] = b_vec[first_index+i];
       }
+      UpdateHRC(hypre_ParVectorLocalVector(u));
+      //printRC(hypre_ParVectorLocalVector(u),"IN GAUSS ELIM");
+      SyncVectorToDevice(hypre_ParVectorLocalVector(u));
       hypre_TFree(A_tmp, HYPRE_MEMORY_HOST);
    }
    if (error_flag) hypre_error(HYPRE_ERROR_GENERIC);

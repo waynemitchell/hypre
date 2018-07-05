@@ -1066,7 +1066,7 @@ hypre_ParVectorCreateFromBlock(  MPI_Comm comm,
    hypre_ParVectorLocalVector(vector) = 
       hypre_SeqVectorCreate(new_partitioning[my_id+1]-new_partitioning[my_id]);
 #endif
-
+   UpdateHRC( hypre_ParVectorLocalVector(vector) );
    /* set defaults */
    hypre_ParVectorOwnsData(vector) = 1;
    hypre_ParVectorOwnsPartitioning(vector) = 1;

@@ -12,12 +12,12 @@
 #ifndef __GPUMEM_H__
 #define  __GPUMEM_H__
 
-#if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 
 #define HYPRE_USE_MANAGED_SCALABLE 1
 #define HYPRE_GPU_USE_PINNED 1
 
-#if defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_MANAGED)||defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 #include <cuda_runtime_api.h>
 void hypre_GPUInit(hypre_int use_device);
 void hypre_GPUFinalize();

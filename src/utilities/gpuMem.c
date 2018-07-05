@@ -14,9 +14,9 @@ size_t memsize(const void *ptr){
 #endif
 
 
-#if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 
-#if defined(HYPRE_USE_MANAGED)
+#if defined(HYPRE_USE_MANAGED) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -185,7 +185,7 @@ void MemPrefetch(const void *ptr,hypre_int device,cudaStream_t stream){
   PUSH_RANGE("MemPreFetchForce",4);
   /* Do a prefetch every time until a possible UM bug is fixed */
   if (size>0){
-     PrintPointerAttributes(ptr);
+     //PrintPointerAttributes(ptr);
      hypre_CheckErrorDevice(cudaMemPrefetchAsync(ptr,size,device,stream));
      hypre_CheckErrorDevice(cudaStreamSynchronize(stream));
      POP_RANGE;

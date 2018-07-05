@@ -747,6 +747,8 @@ HYPRE_Int hypre_MPSchwarzSolve(hypre_ParCSRMatrix *par_A,
    a_dof_dof = hypre_CSRMatrixData(A);
    x = hypre_VectorData(x_vector);
    aux = hypre_VectorData(aux_vector);
+   SyncVectorToHost(x_vector);
+   SyncVectorToHost(aux_vector);
    /* for (i=0; i < num_dofs; i++)
       x[i] = 0.e0; */
 
@@ -856,6 +858,9 @@ HYPRE_Int hypre_MPSchwarzSolve(hypre_ParCSRMatrix *par_A,
    }
 
    if (num_procs > 1) hypre_TFree(rhs, HYPRE_MEMORY_SHARED);
+
+   UpdateHRC(x_vector);
+   UpdateHRC(aux_vector);
 
    return hypre_error_flag;
 }
@@ -2492,6 +2497,8 @@ hypre_parCorrRes( hypre_ParCSRMatrix *A,
 
    if (num_cols_offd)
    {
+
+     SyncVectorToHost(hypre_ParVectorLocalVector(x));
       num_sends = hypre_ParCSRCommPkgNumSends(comm_pkg);
       x_buf_data = hypre_CTAlloc(HYPRE_Real, 
                                  hypre_ParCSRCommPkgSendMapStart(comm_pkg,  num_sends), HYPRE_MEMORY_HOST);
@@ -2518,23 +2525,25 @@ hypre_parCorrRes( hypre_ParCSRMatrix *A,
 
       hypre_ParCSRCommHandleDestroy(comm_handle);
       comm_handle = NULL;
-
+      UpdateHRC(x_tmp);
       hypre_CSRMatrixMatvec(-1.0, offd, x_tmp, 1.0, tmp_vector);
 
       hypre_SeqVectorDestroy(x_tmp);
       hypre_TFree(x_buf_data, HYPRE_MEMORY_HOST);
+
    }
    else
    {
       tmp_vector = hypre_SeqVectorCreate(local_size);
       hypre_SeqVectorInitialize(tmp_vector);
       hypre_SeqVectorCopy(rhs,tmp_vector);
+      UpdateHRC(tmp_vector);
    }
-
+   SyncVectorToHost(tmp_vector);
    *tmp_ptr = hypre_VectorData(tmp_vector);
    hypre_VectorOwnsData(tmp_vector) = 0;
    hypre_SeqVectorDestroy(tmp_vector);
-
+   
    return 0;
 }
 
@@ -2589,6 +2598,7 @@ HYPRE_Int hypre_AdSchwarzSolve(hypre_ParCSRMatrix *par_A,
 
    hypre_ParVectorCopy(par_rhs,par_aux);
    hypre_ParCSRMatrixMatvec(-1.0,par_A,par_x,1.0,par_aux);
+   SyncVectorToHost(aux_vector);
    tmp = hypre_CTAlloc(HYPRE_Real, max_domain_size, HYPRE_MEMORY_HOST);
 
    /* forward solve: ----------------------------------------------- */
@@ -2632,7 +2642,9 @@ HYPRE_Int hypre_AdSchwarzSolve(hypre_ParCSRMatrix *par_A,
       piv_counter += matrix_size;
 
    }
-
+   UpdateHRC(x_vector);
+   SyncVectorToDevice(x_vector);
+   //UpdateHRC(aux_vector);
    hypre_TFree(tmp, HYPRE_MEMORY_HOST);
 
    return hypre_error_flag;

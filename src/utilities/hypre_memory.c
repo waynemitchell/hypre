@@ -21,7 +21,7 @@
 #ifdef HYPRE_USE_UMALLOC
 #undef HYPRE_USE_UMALLOC
 #endif
-
+#include <omp.h>
 /* global variables for OMP 45 */
 #if defined(HYPRE_USE_OMP45)
 HYPRE_Int hypre__global_offload = 0;
@@ -58,9 +58,9 @@ size_t hypre__target_dtoh_bytes = 0;
 /* if  true, DeviceMalloc is always device-only malloc no matter what UM is
  * if false, DeviceMalloc becomes UM malloc when with UM */
 #if defined(HYPRE_USE_MANAGED) && !defined(HYPRE_USE_CUDA) && !defined(HYPRE_USE_OMP45)
-#define DEVICE_ALWAYS_DEVICE 0
+#define DEVICE_ALWARYS_DEVICE 0
 #else
-#define DEVICE_ALWAYS_DEVICE 1
+#define DEVICE_ALWARYS_DEVICE 1
 #endif
 
 /******************************************************************************
@@ -83,7 +83,7 @@ static inline HYPRE_Int hypre_RedefMemLocation(HYPRE_Int location)
 
    if (location == HYPRE_MEMORY_DEVICE)
    {
-#if !DEVICE_ALWAYS_DEVICE && HYPRE_MEMORY_ENV == DEVC_MEM_WTUM
+#if !DEVICE_ALWARYS_DEVICE && HYPRE_MEMORY_ENV == DEVC_MEM_WTUM
       return HYPRE_MEMORY_SHARED;
 #else
       return HYPRE_MEMORY_DEVICE;
@@ -633,7 +633,61 @@ hypre_Memset(void *ptr, HYPRE_Int value, size_t num, HYPRE_Int location)
 
 
 
+#if defined(TRACK_MEMORY_ALLOCATIONS)
+char *
+hypre_MAllocIns( size_t size , HYPRE_Int location,char *file, HYPRE_Int line)
+{
+  char *ret = hypre_MAlloc(size,location);
+  //printf("%s %d %d %p\n",file,line,location,ret);
+  pattr_t *ss=(pattr_t*)hypre_MAlloc(sizeof(pattr_t),HYPRE_MEMORY_HOST);
+  ss->file=file;
+  ss->line=line;
+  ss->type=location;
+  ss->size=size;
+  ss->end=(void*)(ret+size);
+  patpush(ret,ss);
+  return ret;
+}
 
+char *
+hypre_CAllocIns( size_t count, 
+              size_t elt_size,
+		 HYPRE_Int location,char *file, HYPRE_Int line){
+  char *ret=hypre_CAlloc(count,elt_size,location);
+  //printf("%s %d %d %p\n",file,line,location,ret);
+  pattr_t *ss=(pattr_t*)hypre_MAlloc(sizeof(pattr_t),HYPRE_MEMORY_HOST);
+  ss->file=file;
+  ss->line=line;
+  ss->type=location;
+  ss->size=count*elt_size;
+  ss->end=(void*)(ret+ss->size);
+  patpush(ret,ss);
+  return ret;
+}
+
+char *
+hypre_ReAllocIns( char *ptr, size_t size, HYPRE_Int location, char *file, HYPRE_Int line)
+{
+  if (omp_target_is_present(ptr,0)){
+    printf("RAMM REallocating mapped memory  %s , %d %p\n",file,line,ptr);
+    pattr_t *s=patpush(ptr,NULL);
+    printf("Original allocation from %s %d \n",s->file,s->line);
+    //#pragma omp target exit data map(delete:ptr[0:s->size/8])
+  }
+  char *ret = hypre_ReAlloc(ptr,size,location);
+  //printf("%s %d %d %p\n",file,line,location,ret);
+ 
+  pattr_t *ss=(pattr_t*)hypre_MAlloc(sizeof(pattr_t),HYPRE_MEMORY_HOST);
+  ss->file=file;
+  ss->line=line;
+  ss->type=location;
+  ss->size=size;
+  ss->end=(void*)(ret+size);
+  patpush(ret,ss);
+  return ret;
+}
+
+#endif
 
 
 

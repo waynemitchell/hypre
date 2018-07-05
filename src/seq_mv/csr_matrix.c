@@ -737,10 +737,12 @@ void hypre_CSRMatrixMapToDevice(hypre_CSRMatrix *A){
   HYPRE_Int         nnz  = hypre_CSRMatrixNumNonzeros(A); 
   //printf("MAPPED %p sizes = %d %d \n",A,nnz,num_rows);
 
-#pragma omp target enter data map(to:A[0:0])
+  //#pragma omp target enter data map(to:A[0:0])
 #pragma omp target enter data map(alloc:A_data[:nnz]) if (nnz>0)
 #pragma omp target enter data map(alloc:A_i[:num_rows+1]) if (num_rows>0)
 #pragma omp target enter data map(alloc:A_j[:nnz]) if (nnz>0)
+  //printf("Mapped in CSR Matrix %p %p \n",A_i,A_j);
+  //printf("CSR MATRIX MAPPED\n");
   A->mapped=0;
 }
 void hypre_CSRMatrixUpdateToDevice(hypre_CSRMatrix *A){
@@ -770,8 +772,11 @@ void hypre_CSRMatrixUnMapFromDevice(hypre_CSRMatrix *A){
   HYPRE_Int         num_cols = hypre_CSRMatrixNumCols(A);
   HYPRE_Int         nnz  = hypre_CSRMatrixNumNonzeros(A); 
   //#pragma omp target exit data map(delete:A[0:0])
+  if (A->mapped==1){
 #pragma omp target exit data map(delete:A_data[0:nnz]) if (nnz>0)
 #pragma omp target exit data map(delete:A_i[0:num_rows+1]) if (num_rows>0)
 #pragma omp target exit data map(delete:A_j[0:nnz]) if (nnz>0)
+    //printf("UNMAPPED in CSR Matrix %p %p \n",A_i,A_j);
+  }
 }
 #endif

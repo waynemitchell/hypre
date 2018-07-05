@@ -295,11 +295,12 @@ HYPRE_EuclidSolve( HYPRE_Solver solver,
   START_FUNC_DH
   Euclid_dh eu = (Euclid_dh)solver;
   HYPRE_Real *b, *x;
-
   x = hypre_VectorData(hypre_ParVectorLocalVector((hypre_ParVector *) bb));
   b = hypre_VectorData(hypre_ParVectorLocalVector((hypre_ParVector *) xx));
-
+  SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) bb));
+  SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) xx));
   Euclid_dhApply(eu, x, b); HYPRE_EUCLID_ERRCHKA;
+  UpdateHRC(hypre_ParVectorLocalVector((hypre_ParVector *) xx));
   END_FUNC_VAL(0)
 }
 

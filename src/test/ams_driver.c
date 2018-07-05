@@ -89,6 +89,7 @@ void AMSDriverVectorRead(const char *file, HYPRE_ParVector *x)
          HYPRE_IJVectorRead(file, hypre_MPI_COMM_WORLD, HYPRE_PARCSR, &ij_x);
          HYPRE_IJVectorGetObject(ij_x, &object);
          *x = (HYPRE_ParVector) object;
+	 SetHRC(hypre_ParVectorLocalVector(*x));
          hypre_IJVectorObject((hypre_IJVector *)ij_x) = NULL;
          HYPRE_IJVectorDestroy(ij_x);
       }

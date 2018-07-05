@@ -114,10 +114,15 @@ HYPRE_ParCSRPilutSolve( HYPRE_Solver solver,
    rhs = hypre_VectorData( hypre_ParVectorLocalVector( (hypre_ParVector *)b ) );
    soln = hypre_VectorData( hypre_ParVectorLocalVector( (hypre_ParVector *)x ) );
 
+   SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) b));
+   SyncVectorToHost(hypre_ParVectorLocalVector((hypre_ParVector *) x));
+
    HYPRE_DistributedMatrixPilutSolverSolve(
       (HYPRE_DistributedMatrixPilutSolver) solver,
       soln, rhs );
 
+   UpdateHRC(hypre_ParVectorLocalVector((hypre_ParVector *) x));
+   
    return hypre_error_flag;
 }
 

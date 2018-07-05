@@ -403,7 +403,10 @@ HYPRE_SStructSplitSolve( HYPRE_SStructSolver solver,
          parcsrA = hypre_SStructMatrixParCSRMatrix(A);
          hypre_SStructVectorConvert(x, &parx);
          hypre_SStructVectorConvert(y, &pary);
+	 UpdateHRC(hypre_ParVectorLocalVector(parx));
+	 UpdateHRC(hypre_ParVectorLocalVector(pary));
          hypre_ParCSRMatrixMatvec(-1.0, parcsrA, parx, 1.0, pary);
+	 SyncVectorToHost(hypre_ParVectorLocalVector(pary));
          hypre_SStructVectorRestore(x, NULL);
          hypre_SStructVectorRestore(y, pary);
       }

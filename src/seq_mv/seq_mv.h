@@ -220,6 +220,7 @@ typedef struct
   HYPRE_Int on_device;
 #endif
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
+  HYPRE_Complex *pcopy;
   HYPRE_Int mapped;
   HYPRE_Int drc; /* device ref count */
   HYPRE_Int hrc; /* host ref count */
@@ -379,6 +380,7 @@ hypre_Vector *hypre_SeqVectorCloneShallow ( hypre_Vector *x );
 HYPRE_Int hypre_SeqVectorScale ( HYPRE_Complex alpha , hypre_Vector *y );
 HYPRE_Int hypre_SeqVectorAxpy ( HYPRE_Complex alpha , hypre_Vector *x , hypre_Vector *y );
 HYPRE_Real hypre_SeqVectorInnerProd ( hypre_Vector *x , hypre_Vector *y );
+HYPRE_Real hypre_SeqVectorInnerProdHost ( hypre_Vector *x , hypre_Vector *y );
 HYPRE_Complex hypre_VectorSumElts ( hypre_Vector *vector );
 #ifdef HYPRE_USE_MANAGED
 HYPRE_Complex hypre_VectorSumAbsElts ( hypre_Vector *vector );
@@ -389,12 +391,14 @@ void hypre_SeqVectorPrefetchToDevice(hypre_Vector *x);
 void hypre_SeqVectorPrefetchToHost(hypre_Vector *x);
 void hypre_SeqVectorPrefetchToDeviceInStream(hypre_Vector *x, HYPRE_Int index);
 hypre_int hypre_SeqVectorIsManaged(hypre_Vector *x);
+
 #endif
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
 void hypre_SeqVectorMapToDevice(hypre_Vector *x);
 void hypre_SeqVectorUnMapFromDevice(hypre_Vector *x);
 void hypre_SeqVectorUpdateDevice(hypre_Vector *x);
 void hypre_SeqVectorUpdateHost(hypre_Vector *x);
+  HYPRE_Complex *get_device_pointer(HYPRE_Complex *ptr);
 #endif
 
 HYPRE_Int hypre_CSRMatrixMatvecOutOfPlaceOOMP3( HYPRE_Complex alpha, hypre_CSRMatrix *A, hypre_Vector *x, HYPRE_Complex beta, hypre_Vector *b, hypre_Vector *y, HYPRE_Int offset);

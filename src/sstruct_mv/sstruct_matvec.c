@@ -319,10 +319,19 @@ hypre_SStructMatvecCompute( void                *matvec_vdata,
           *  to the parx and pary. */  
 
          hypre_SStructVectorConvert(x, &parx);
-         hypre_SStructVectorConvert(y, &pary); 
+         hypre_SStructVectorConvert(y, &pary);
+	 
+	 /* WARNING :: These 2 updates below are required for tests in TEST_sstruct 
+	    only because the sstruct code is running on the host. They need to be removed
+	    for testing with the offloaded versions of struct code  PBUGS */
 
+	 UpdateHRC(hypre_ParVectorLocalVector(pary));
+	 UpdateHRC(hypre_ParVectorLocalVector(parx));
+
+	 
          hypre_ParCSRMatrixMatvec(alpha, parcsrA, parx, 1.0, pary);
-
+	 SyncVectorToHost(hypre_ParVectorLocalVector(pary));
+	 
          /* dummy functions since there is nothing to restore  */
 
          hypre_SStructVectorRestore(x, NULL);
@@ -339,7 +348,8 @@ hypre_SStructMatvecCompute( void                *matvec_vdata,
       hypre_SStructVectorConvert(y, &pary);
 
       hypre_ParCSRMatrixMatvec(alpha, parcsrA, parx, beta, pary);
-
+      //printRC(hypre_ParVectorLocalVector(pary),"IN SSTRCUT");
+      SyncVectorToHost(hypre_ParVectorLocalVector(pary));
       hypre_SStructVectorRestore(x, NULL);
       hypre_SStructVectorRestore(y, pary); 
 

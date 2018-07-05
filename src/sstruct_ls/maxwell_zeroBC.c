@@ -34,13 +34,13 @@ hypre_SeqVectorZeroBCValues(hypre_Vector *v,
    HYPRE_Real  *vector_data = hypre_VectorData(v);
    HYPRE_Int      i;
    HYPRE_Int      ierr  = 0;
-
+   SyncVectorToHost(v);
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(i) HYPRE_SMP_SCHEDULE
 #endif
    for (i = 0; i < nrows; i++)
       vector_data[rows[i]]= 0.0;
-
+   UpdateHRC(v);
    return ierr;
 }
 

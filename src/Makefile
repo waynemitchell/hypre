@@ -88,6 +88,7 @@ HYPRE_EXTRA_DIRS =\
 
 all:
 	@ \
+        rm `find . -name \*.a`; \
 	mkdir -p ${HYPRE_BUILD_DIR}/include; \
 	mkdir -p ${HYPRE_BUILD_DIR}/lib; \
 	cp -fR HYPRE_config.h ${HYPRE_BUILD_DIR}/include/.; \

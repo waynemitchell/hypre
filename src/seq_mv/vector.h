@@ -44,6 +44,7 @@ typedef struct
   HYPRE_Int on_device;
 #endif
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
+  HYPRE_Complex *pcopy;
   HYPRE_Int mapped;
   HYPRE_Int drc; /* device ref count */
   HYPRE_Int hrc; /* host ref count */

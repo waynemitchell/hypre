@@ -358,7 +358,7 @@ hypre_seqAMGCycle( hypre_ParAMGData *amg_data,
    u_data  = hypre_VectorData(u_local);
    n =  hypre_VectorSize(u_local);
 
-
+   SyncVectorToHost(u_local);
    /*if (A_coarse)*/
    if (hypre_ParAMGDataParticipate(amg_data))
    {
@@ -379,6 +379,8 @@ hypre_seqAMGCycle( hypre_ParAMGData *amg_data,
       f_local = hypre_ParVectorLocalVector(Aux_F);
       f_data = hypre_VectorData(f_local);
       nf =  hypre_VectorSize(f_local);
+
+      SyncVectorToHost(f_local);
 
       /* first f */
       info = hypre_CTAlloc(HYPRE_Int,  new_num_procs, HYPRE_MEMORY_HOST);
@@ -434,7 +436,8 @@ hypre_seqAMGCycle( hypre_ParAMGData *amg_data,
       /* clean up */
       if (redundant || my_id ==0)
       {
-         hypre_BoomerAMGSolve(coarse_solver, A_coarse, F_coarse, U_coarse);
+	UpdateHRC(hypre_ParVectorLocalVector(F_coarse));
+	hypre_BoomerAMGSolve(coarse_solver, A_coarse, F_coarse, U_coarse);
       }
 
       /*copy my part of U to parallel vector */
@@ -443,7 +446,7 @@ hypre_seqAMGCycle( hypre_ParAMGData *amg_data,
          HYPRE_Real *local_data;
 
          local_data =  hypre_VectorData(hypre_ParVectorLocalVector(U_coarse));
-
+	 SyncVectorToHost(hypre_ParVectorLocalVector(U_coarse));
          for (i = 0; i < n; i++)
          {
             u_data[i] = local_data[first_index+i];
@@ -453,9 +456,10 @@ hypre_seqAMGCycle( hypre_ParAMGData *amg_data,
       {
          HYPRE_Real *local_data=NULL;
 
-         if (my_id == 0)
+         if (my_id == 0){
             local_data =  hypre_VectorData(hypre_ParVectorLocalVector(U_coarse));
-
+	    SyncVectorToHost(hypre_ParVectorLocalVector(U_coarse));
+	 }
          hypre_MPI_Scatterv ( local_data, info, displs, HYPRE_MPI_REAL,
                        u_data, n, HYPRE_MPI_REAL, 0, new_comm );
          /*if (my_id == 0)
@@ -466,7 +470,7 @@ hypre_seqAMGCycle( hypre_ParAMGData *amg_data,
          hypre_TFree(info, HYPRE_MEMORY_HOST);
       }
    }
-
+   UpdateHRC(u_local);
    return(Solve_err_flag);
 }
 

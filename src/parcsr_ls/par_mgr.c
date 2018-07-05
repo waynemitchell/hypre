@@ -2063,7 +2063,11 @@ HYPRE_Int hypre_block_jacobi (hypre_ParCSRMatrix *A,
 	HYPRE_Int		   num_procs, my_id;
 	HYPRE_Real	    *res;
 
-    const HYPRE_Int     nb2 = blk_size*blk_size;
+	const HYPRE_Int     nb2 = blk_size*blk_size;
+    
+
+	SyncVectorToHost(u_local);
+	SyncVectorToHost(f_local);
 
 	hypre_MPI_Comm_size(comm,&num_procs);
 	hypre_MPI_Comm_rank(comm,&my_id);
@@ -2160,7 +2164,11 @@ HYPRE_Int hypre_block_jacobi (hypre_ParCSRMatrix *A,
 	 hypre_TFree(Vext_data, HYPRE_MEMORY_HOST);
 	 hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
 	}
- hypre_TFree(res, HYPRE_MEMORY_HOST);
+
+	UpdateHRC(u_local);
+	SyncVectorToDevice(u_local);
+
+	hypre_TFree(res, HYPRE_MEMORY_HOST);
 	return(relax_error);
 }
 

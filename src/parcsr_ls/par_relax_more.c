@@ -38,6 +38,7 @@ HYPRE_Int hypre_ParCSRMaxEigEstimate(hypre_ParCSRMatrix *A, /* matrix to relax w
    HYPRE_Int   j;
    HYPRE_Int i, start;
    
+   printf("EIG ESTIMATE\n");
 
    /* estimate with the inf-norm of A - should be ok for SPD matrices */
 
@@ -208,7 +209,7 @@ HYPRE_Int hypre_ParCSRMaxEigEstimateCG(hypre_ParCSRMatrix *A, /* matrix to relax
           diag = A_diag_data[A_diag_i[i]];
           ds_data[i] = 1/sqrt(diag);
        }
-       
+       UpdateHRC(hypre_ParVectorLocalVector(ds));
     }
     else
     {
@@ -240,12 +241,15 @@ HYPRE_Int hypre_ParCSRMaxEigEstimateCG(hypre_ParCSRMatrix *A, /* matrix to relax
           beta = 1.0;
           /* p_0 = C*r */
           hypre_ParVectorCopy(s, p);
+	  SyncVectorToHost(hypre_ParVectorLocalVector(p));
        }
        else
        {
           /* beta = gamma / gamma_old */
           beta = gamma / gamma_old;
-          
+
+	  SyncVectorToHost(hypre_ParVectorLocalVector(s));
+		  
           /* p = s + beta p */
 #ifdef HYPRE_USING_OPENMP
 #pragma omp parallel for private(j) HYPRE_SMP_SCHEDULE
@@ -254,22 +258,27 @@ HYPRE_Int hypre_ParCSRMaxEigEstimateCG(hypre_ParCSRMatrix *A, /* matrix to relax
           {
              p_data[j] = s_data[j] + beta*p_data[j];
           }
+	  UpdateHRC(hypre_ParVectorLocalVector(p));
        }
        
        if (scale)
        {
            /* s = D^{-1/2}A*D^{-1/2}*p */
+	 //SyncVectorToHost(hypre_ParVectorLocalVector(p));
+	 SyncVectorToHost(hypre_ParVectorLocalVector(ds));
           for (j = 0; j < local_size; j++)
           {
              u_data[j] = ds_data[j] * p_data[j];
           }
+	  UpdateHRC(hypre_ParVectorLocalVector(u));
           hypre_ParCSRMatrixMatvec(1.0, A, u, 0.0, s);
+	  SyncVectorToHost(hypre_ParVectorLocalVector(s));
           for (j = 0; j < local_size; j++)
           {
              s_data[j] = ds_data[j] * s_data[j];
           }
-
-
+	  UpdateHRC(hypre_ParVectorLocalVector(s));
+	  
        }
        else
        {
@@ -304,6 +313,7 @@ HYPRE_Int hypre_ParCSRMaxEigEstimateCG(hypre_ParCSRMatrix *A, /* matrix to relax
     }
 
     /* eispack routine - eigenvalues return in tridiag and ordered*/
+    //printf("LINPACK!!!\n");
     hypre_LINPACKcgtql1(&i,tridiag,trioffd,&err);
     
     lambda_max = tridiag[i-1];
@@ -1045,7 +1055,8 @@ HYPRE_Int  hypre_ParCSRRelax_L1_Jacobi( hypre_ParCSRMatrix *A,
 
     hypre_MPI_Comm_size(comm,&num_procs);  
     hypre_MPI_Comm_rank(comm,&my_id);  
-
+    SyncVectorToHost(u_local);
+    SyncVectorToHost(f_local);
     if (num_procs > 1)
     {
        num_sends = hypre_ParCSRCommPkgNumSends(comm_pkg);
@@ -1164,7 +1175,9 @@ HYPRE_Int  hypre_ParCSRRelax_L1_Jacobi( hypre_ParCSRMatrix *A,
        hypre_TFree(Vext_data, HYPRE_MEMORY_HOST);
        hypre_TFree(v_buf_data, HYPRE_MEMORY_HOST);
     }
-
+    UpdateHRC(u_local);
+    SyncVectorToDevice(u_local);
+    
     return 0;
 
 }
