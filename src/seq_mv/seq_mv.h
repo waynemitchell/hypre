@@ -407,7 +407,7 @@ HYPRE_Int hypre_CSRMatrixMatvecOutOfPlaceOOMP3( HYPRE_Complex alpha, hypre_CSRMa
 }
 #endif
 
-#ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 inline void UpdateHRC(hypre_Vector *v){
   v->hrc++;
 }
@@ -425,6 +425,20 @@ inline void SyncVectorToDevice(hypre_Vector *v){
 }
 inline void SyncVectorToHost(hypre_Vector *v){
   if (v->drc>v->hrc) hypre_SeqVectorUpdateHost(v);
+}
+#else
+/* Do nothing stubs */
+inline void UpdateHRC(hypre_Vector *v){
+}
+inline void UpdateDRC(hypre_Vector *v){
+}
+inline void SetHRC(hypre_Vector *v){
+}
+inline void SetDRC(hypre_Vector *v){
+}
+inline void SyncVectorToDevice(hypre_Vector *v){
+}
+inline void SyncVectorToHost(hypre_Vector *v){
 }
 #endif
 

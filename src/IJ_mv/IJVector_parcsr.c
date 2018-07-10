@@ -437,7 +437,9 @@ hypre_IJVectorSetValuesPar(hypre_IJVector       *vector,
       for (j = 0; j < num_values; j++)
          data[j] = values[j];
    } 
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
    if (local_vector->hrc<=local_vector->drc) UpdateHRC(local_vector);
+#endif
   //printRC(local_vector,"IJ VECTOR");
   //SyncVectorToDevice(local_vector);
   //printf("IJ VECTPR UPDATED\n");

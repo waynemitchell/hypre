@@ -637,7 +637,7 @@ hypre_Memset(void *ptr, HYPRE_Int value, size_t num, HYPRE_Int location)
 char *
 hypre_MAllocIns( size_t size , HYPRE_Int location,char *file, HYPRE_Int line)
 {
-  char *ret = hypre_MAlloc(size,location);
+  char *ret = (char*)hypre_MAlloc(size,location);
   //printf("%s %d %d %p\n",file,line,location,ret);
   pattr_t *ss=(pattr_t*)hypre_MAlloc(sizeof(pattr_t),HYPRE_MEMORY_HOST);
   ss->file=file;
@@ -653,7 +653,7 @@ char *
 hypre_CAllocIns( size_t count, 
               size_t elt_size,
 		 HYPRE_Int location,char *file, HYPRE_Int line){
-  char *ret=hypre_CAlloc(count,elt_size,location);
+  char *ret=(char*)hypre_CAlloc(count,elt_size,location);
   //printf("%s %d %d %p\n",file,line,location,ret);
   pattr_t *ss=(pattr_t*)hypre_MAlloc(sizeof(pattr_t),HYPRE_MEMORY_HOST);
   ss->file=file;
@@ -674,7 +674,7 @@ hypre_ReAllocIns( char *ptr, size_t size, HYPRE_Int location, char *file, HYPRE_
     printf("Original allocation from %s %d \n",s->file,s->line);
     //#pragma omp target exit data map(delete:ptr[0:s->size/8])
   }
-  char *ret = hypre_ReAlloc(ptr,size,location);
+  char *ret = (char*)hypre_ReAlloc(ptr,size,location);
   //printf("%s %d %d %p\n",file,line,location,ret);
  
   pattr_t *ss=(pattr_t*)hypre_MAlloc(sizeof(pattr_t),HYPRE_MEMORY_HOST);

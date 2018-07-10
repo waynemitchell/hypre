@@ -2102,11 +2102,11 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                   hypre_TFree(hypre_VectorData(Vtemp_local), HYPRE_MEMORY_SHARED); 
                   hypre_VectorSize(Vtemp_local) = local_P_sz; 
                   hypre_VectorData(Vtemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_SHARED);
-		  printf("AND WE HAVE IT %d %p \n",hypre_ParVectorLocalVector(Vtemp)->mapped,hypre_VectorData(Vtemp_local) );
+		  //printf("AND WE HAVE IT %d %p \n",hypre_ParVectorLocalVector(Vtemp)->mapped,hypre_VectorData(Vtemp_local) );
                   if (Ztemp)
                   {
                      hypre_Vector* Ztemp_local = hypre_ParVectorLocalVector(Ztemp);
-		     printf("ZTEMP AND WE HAVE IT %d \n",Ztemp_local->mapped);
+		     //printf("ZTEMP AND WE HAVE IT %d \n",Ztemp_local->mapped);
                      hypre_TFree(hypre_VectorData(Ztemp_local), HYPRE_MEMORY_SHARED); 
                      hypre_VectorSize(Ztemp_local) = local_P_sz; 
                      hypre_VectorData(Ztemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_HOST);
@@ -2114,7 +2114,7 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                   if (Ptemp)
                   {
                      hypre_Vector* Ptemp_local = hypre_ParVectorLocalVector(Ptemp);
-		     printf("PTEMP AND WE HAVE IT %d \n",Ptemp_local->mapped);
+		     //printf("PTEMP AND WE HAVE IT %d \n",Ptemp_local->mapped);
                      hypre_TFree(hypre_VectorData(Ptemp_local), HYPRE_MEMORY_HOST); 
                      hypre_VectorSize(Ptemp_local) = local_P_sz; 
                      hypre_VectorData(Ptemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_HOST);
@@ -2122,7 +2122,7 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                   if (Rtemp)
                   {
                      hypre_Vector* Rtemp_local = hypre_ParVectorLocalVector(Rtemp);
-		     printf("RTEMP AND WE HAVE IT %d \n",Rtemp_local->mapped);
+		     //printf("RTEMP AND WE HAVE IT %d \n",Rtemp_local->mapped);
                      hypre_TFree(hypre_VectorData(Rtemp_local), HYPRE_MEMORY_HOST); 
                      hypre_VectorSize(Rtemp_local) = local_P_sz; 
                      hypre_VectorData(Rtemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_HOST);

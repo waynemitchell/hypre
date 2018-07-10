@@ -18,7 +18,7 @@ extern "C"{
     int line;
     int type;} pattr_t;
   
-  pattr_t *patpush(void *ptr, pattr_t *ss){
+  pattr_t *patpush(const void *ptr, pattr_t *ss){
     static std::unordered_map<void*,pattr_t *> map;
     pattr_t *retval=NULL;
 #ifdef TRACK_TO_FILE
@@ -33,12 +33,12 @@ extern "C"{
 #pragma omp critical
     {
       if (ss!=NULL) {
-	map[ptr]=ss;
+	map[const_cast<void*>(ptr)]=ss;
 #ifdef TRACK_TO_FILE
         my<<reinterpret_cast<uintptr_t>(ptr)<<" "<<reinterpret_cast<uintptr_t>(ss->end)<<" "<<ss->line<<"  "<<ss->file<<"\n";
 #endif
       } else {
-	std::unordered_map<void*,pattr_t*>::const_iterator got = map.find (ptr);
+	std::unordered_map<void*,pattr_t*>::const_iterator got = map.find (const_cast<void*>(ptr));
 	if (got==map.end()){
 	  //std:cerr<<"ELEMENT NOT FOUND IN MAP\n";
 	  // DO a range check for pointers which might be offsets 

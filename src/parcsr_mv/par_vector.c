@@ -1084,12 +1084,12 @@ hypre_int hypre_ParVectorIsManaged(hypre_ParVector *vector){
   return hypre_SeqVectorIsManaged(hypre_ParVectorLocalVector(vector));
 }
 #endif
-#ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 void hypre_ParVectorUpdateHost(hypre_ParVector *p){
 #pragma omp target update from(p->local_vector->data[0:p->local_vector->size]) if (p->local_vector->size>0)
   SetHRC(p->local_vector);
 }
-#endif
+
 HYPRE_Int DiffHD( hypre_ParVector *A){
   if (A==NULL) {
     printf("NULL VECTOR\n");
@@ -1105,3 +1105,6 @@ HYPRE_Int DiffHD( hypre_ParVector *A){
   } else printf("%d All is well Value(%p) = %g Size = %d \n",mapped,hypre_ParVectorLocalVector(A), HP,hypre_ParVectorLocalVector(A)->size);
   return 1;
 }
+#else
+HYPRE_Int DiffHD( hypre_ParVector *A){ return 1;}
+#endif

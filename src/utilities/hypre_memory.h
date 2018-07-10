@@ -221,7 +221,7 @@ typedef struct {
   HYPRE_Int line;
   HYPRE_Int type;} pattr_t;
 
-pattr_t *patpush(void *ptr, pattr_t *ss);
+pattr_t *patpush(const void *ptr, pattr_t *ss);
 
 #define hypre_TAlloc(type, count, location) \
   ( (type *)hypre_MAllocIns((size_t)(sizeof(type) * (count)), location,__FILE__,__LINE__) )

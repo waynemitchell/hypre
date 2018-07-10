@@ -798,7 +798,7 @@ hypre_int hypre_SeqVectorIsManaged(hypre_Vector *x){
 
 
 
-#ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 
 void hypre_SeqVectorMapToDevice(hypre_Vector *x){
   if (x==NULL) return;
@@ -936,6 +936,8 @@ HYPRE_Complex *get_device_pointer(HYPRE_Complex *ptr){
   retval = get_device_pointer_actual(ptr);
   return retval;
 }
+#else
+/* Stubs for the OpenMP mapping functions */
 
 #endif
 

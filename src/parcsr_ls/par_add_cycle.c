@@ -792,9 +792,11 @@ HYPRE_Int hypre_CreateLambda(void *amg_vdata)
    //printf("XTILDE START END %" PRIuPTR ", %" PRIuPTR " %d %d \n",(uintptr_t)Xtilde_local->data,(uintptr_t)(Xtilde_local->data+num_rows_L),num_rows_L,Xtilde_local->size);
    x_data = hypre_VectorData(hypre_ParVectorLocalVector(Xtilde));
    r_data = hypre_VectorData(hypre_ParVectorLocalVector(Rtilde));
-
+   
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
    hypre_SeqVectorMapToDevice(Xtilde_local);
    hypre_SeqVectorMapToDevice(Rtilde_local);
+#endif
    //UpdateHRC(Xtilde_local);
    //UpdateHRC(Rtilde_local);
 
@@ -824,8 +826,9 @@ HYPRE_Int hypre_CreateLambda(void *amg_vdata)
 	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
 	 if (hypre_ParVectorLocalVector(F_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(F_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(F_array[level])) = 0;
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(F_array[level]));
-
+#endif
          tmp_data = hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]));
 	 //printf("TMP DATA %p %d\n",tmp_data,hypre_ParVectorLocalVector(U_array[level])->mapped);
          if (tmp_data) hypre_TFree(tmp_data, HYPRE_MEMORY_SHARED);
@@ -833,7 +836,9 @@ HYPRE_Int hypre_CreateLambda(void *amg_vdata)
 	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
 	 if (hypre_ParVectorLocalVector(U_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(U_array[level])) = 0;
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(U_array[level]));
+#endif
 	 //printf("SIZEs %d %p %d \n",level,&x_data[row_start],hypre_ParVectorLocalVector(U_array[level])->size);
       }
       cnt_level++;
@@ -1164,9 +1169,10 @@ HYPRE_Int hypre_CreateDinv(void *amg_vdata)
    x_data = hypre_VectorData(hypre_ParVectorLocalVector(Xtilde));
    r_data = hypre_VectorData(hypre_ParVectorLocalVector(Rtilde));
    D_inv = hypre_CTAlloc(HYPRE_Real,  num_rows_L, HYPRE_MEMORY_HOST);
-
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
    hypre_SeqVectorMapToDevice(Xtilde_local);
    hypre_SeqVectorMapToDevice(Rtilde_local);
+#endif
    //printRC(Xtilde_local,"IN DINV");
    l1_start = 0;
    for (level=addlvl; level < add_end; level++)
@@ -1179,7 +1185,9 @@ HYPRE_Int hypre_CreateDinv(void *amg_vdata)
 	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
 	 if (hypre_ParVectorLocalVector(F_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(F_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(F_array[level])) = 0;
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(F_array[level]));
+#endif
 
          tmp_data = hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]));
          if (tmp_data) hypre_TFree(tmp_data, HYPRE_MEMORY_SHARED);
@@ -1187,7 +1195,9 @@ HYPRE_Int hypre_CreateDinv(void *amg_vdata)
 	 // Following line eliminates OMP4.5 warnings abot mapping null pointers
 	 if (hypre_ParVectorLocalVector(U_array[level])->size==0) hypre_VectorData(hypre_ParVectorLocalVector(U_array[level]))=NULL;
          hypre_VectorOwnsData(hypre_ParVectorLocalVector(U_array[level])) = 0;
+#if defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 	 hypre_SeqVectorMapToDevice(hypre_ParVectorLocalVector(U_array[level]));
+#endif
       }
 
       A_tmp = A_array[level];
