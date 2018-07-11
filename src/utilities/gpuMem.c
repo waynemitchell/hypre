@@ -44,7 +44,7 @@ void hypre_GPUInit(hypre_int use_device){
     HYPRE_GPU_HANDLE=1;
     HYPRE_DEVICE=0;
     hypre_CheckErrorDevice(cudaGetDeviceCount(&nDevices));
-
+    if (nDevices!=1) hypre_printf("WARNING:: nDevices is not 1 \n");
     /* XXX */
     nDevices = 1; /* DO NOT COMMENT ME OUT AGAIN! nDevices does NOT WORK !!!! */
     HYPRE_DEVICE_COUNT=nDevices;
