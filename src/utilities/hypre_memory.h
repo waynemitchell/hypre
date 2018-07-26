@@ -211,7 +211,7 @@ hypre__offload_flag: 0 == OK; 1 == WRONG
 */
 
 
-#define TRACK_MEMORY_ALLOCATIONS
+//#define TRACK_MEMORY_ALLOCATIONS
 #if defined(TRACK_MEMORY_ALLOCATIONS)
 
 typedef struct {
@@ -248,6 +248,17 @@ void assert_check_host(void *ptr, char *file, HYPRE_Int line);
 #endif
 
 #else
+
+#if defined(HYPRE_USE_MANAGED)
+#define ASSERT_MANAGED(ptr)\
+  ( assert_check((ptr),__FILE__,__LINE__))
+
+#define ASSERT_HOST(ptr)\
+  ( assert_check_host((ptr),__FILE__,__LINE__))
+#else
+#define ASSERT_MANAGED(ptr)			
+#define ASSERT_HOST(ptr)
+#endif
 
 #if 0
 

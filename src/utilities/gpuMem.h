@@ -19,6 +19,7 @@
 
 #if defined(HYPRE_USE_MANAGED)||defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 #include <cuda_runtime_api.h>
+hypre_int hypre_presetGPUID();
 void hypre_GPUInit(hypre_int use_device);
 void hypre_GPUFinalize();
 int VecScaleScalar(double *u, const double alpha,  int num_rows,cudaStream_t s);

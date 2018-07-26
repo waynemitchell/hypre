@@ -147,7 +147,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
          x_buf_data[jv] = hypre_CTAlloc(HYPRE_Complex,  hypre_ParCSRCommPkgSendMapStart
                                         (comm_pkg,  num_sends), HYPRE_MEMORY_SHARED);
    }
-   
+#define DEBUG_PACK_ON_DEVICE 1
    if ( num_vectors==1 )
    {
       HYPRE_Int begin = hypre_ParCSRCommPkgSendMapStart(comm_pkg, 0);
@@ -161,9 +161,9 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #if defined(DEBUG_PACK_ON_DEVICE)
       hypre_CheckErrorDevice(cudaPeekAtLastError());
       hypre_CheckErrorDevice(cudaDeviceSynchronize());
-      ASSERT_MANAGED(x_buf_data[0]);
-      ASSERT_MANAGED(x_local_data);
-      ASSERT_MANAGED(hypre_ParCSRCommPkgSendMapElmts(comm_pkg));
+      //ASSERT_MANAGED(x_buf_data[0]);
+      //ASSERT_MANAGED(x_local_data);
+      //ASSERT_MANAGED(hypre_ParCSRCommPkgSendMapElmts(comm_pkg));
 #endif
       PackOnDevice((HYPRE_Complex*)x_buf_data[0],x_local_data,hypre_ParCSRCommPkgSendMapElmts(comm_pkg),begin,end,HYPRE_STREAM(4));
 #if defined(DEBUG_PACK_ON_DEVICE)

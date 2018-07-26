@@ -15,7 +15,7 @@ size_t memsize(const void *ptr){
 
 
 #if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
-
+#include <nvml.h>
 #if defined(HYPRE_USE_MANAGED) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 #include <stdlib.h>
 #include <stdint.h>
@@ -28,6 +28,27 @@ hypre_int ggc(hypre_int id);
 /* Global struct that holds device,library handles etc */
 struct hypre__global_struct hypre__global_handle = { .initd=0, .device=0, .device_count=1,.memoryHWM=0};
 
+hypre_int hypre_presetGPUID(){
+  hypre_int nDevices;
+  hypre_CheckErrorDevice(cudaGetDeviceCount(&nDevices));
+  if (nDevices>1){
+    char *crank=getenv("OMPI_COMM_WORLD_LOCAL_RANK");
+    hypre_int device = atoi(crank)%nDevices;
+    hypre_CheckErrorDevice(cudaSetDevice(atoi(crank)));
+    hypre_printf("hypre_presetGPUID():: Device set to %d\n",device);
+    char uuid[80];
+    if (nvmlInit()!=NVML_SUCCESS) hypre_printf("NVML INIT CALL FAILED\n");
+    nvmlDevice_t nvdev;
+    if (nvmlDeviceGetHandleByIndex(device,&nvdev)!=NVML_SUCCESS) hypre_printf("NVML GetHandleByIndex CALL FAILED\n");
+    if (nvmlDeviceGetUUID (nvdev,uuid,80)!=NVML_SUCCESS) hypre_printf("UUID CALL FAILED\n");
+    unsigned long mask[3];
+    if (nvmlDeviceGetCpuAffinity(nvdev,3,mask)!=NVML_SUCCESS) hypre_printf("NVML GET CPU AFFINITY FAILED \n");
+    if (nvmlDeviceSetCpuAffinity(nvdev)!=NVML_SUCCESS) hypre_printf("NVML SET CPU AFFINITY FAILED \n"); else hypre_printf("NVML SET CPU AFFINITY CALLED SUCCESFULLY\n");
+    if (nvmlShutdown()!=NVML_SUCCESS) hypre_printf("NVML SHUTDOWN CALL FAILED\n");
+    return device;
+  }
+  return -1;
+}
 
 /* Initialize GPU branch of Hypre AMG */
 /* use_device =-1 */
@@ -44,9 +65,9 @@ void hypre_GPUInit(hypre_int use_device){
     HYPRE_GPU_HANDLE=1;
     HYPRE_DEVICE=0;
     hypre_CheckErrorDevice(cudaGetDeviceCount(&nDevices));
-    if (nDevices!=1) hypre_printf("WARNING:: nDevices is not 1 \n");
+
     /* XXX */
-    nDevices = 1; /* DO NOT COMMENT ME OUT AGAIN! nDevices does NOT WORK !!!! */
+    //nDevices = 1; /* DO NOT COMMENT ME OUT AGAIN! nDevices does NOT WORK !!!! */
     HYPRE_DEVICE_COUNT=nDevices;
     
     /* TODO cannot use nDevices to check if mpibind is used, need to rewrite 
@@ -68,7 +89,7 @@ void hypre_GPUInit(hypre_int use_device){
 	MPI_Info info;
 	MPI_Info_create(&info);
 	MPI_Comm_split_type(hypre_MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, myid, info, &node_comm);
-	hypre_int round_robin=1;
+	hypre_int round_robin=0;
 	hypre_int myNodeid, NodeSize;
 	MPI_Comm_rank(node_comm, &myNodeid);
 	MPI_Comm_size(node_comm, &NodeSize);
@@ -89,9 +110,24 @@ void hypre_GPUInit(hypre_int use_device){
 	  MPI_Comm_size(numa_comm, &NumaSize);
 	  hypre_int domain_devices=nDevices/2; /* Again hardwired for 2 NUMA domains */
 	  HYPRE_DEVICE = getnuma()*2+myNumaId%domain_devices;
+	  HYPRE_DEVICE = myNodeid%nDevices;
 	  hypre_CheckErrorDevice(cudaSetDevice(HYPRE_DEVICE));
 	  hypre_printf("WARNING:: Code running without mpibind\n");
+	  char uuid[80];
+	  if (nvmlInit()!=NVML_SUCCESS) hypre_printf("NVML INIT CALL FAILED\n");
+	  nvmlDevice_t nvdev;
+	  if (nvmlDeviceGetHandleByIndex(HYPRE_DEVICE,&nvdev)!=NVML_SUCCESS) hypre_printf("NVML GetHandleByIndex CALL FAILED\n");
+	  if (nvmlDeviceGetUUID (nvdev,uuid,80)!=NVML_SUCCESS) hypre_printf("UUID CALL FAILED\n");
+	  unsigned long mask[3];
+	  if (nvmlDeviceGetCpuAffinity(nvdev,3,mask)!=NVML_SUCCESS) hypre_printf("NVML GET CPU AFFINITY FAILED \n");
+	  if (nvmlDeviceSetCpuAffinity(nvdev)!=NVML_SUCCESS) hypre_printf("NVML SET CPU AFFINITY FAILED \n"); else hypre_printf("NVML SET CPU AFFINITY CALLED SUCCESFULLY\n");
+	  //cpu_set_t cmask;
+	  //33333333333CPU_ZERO( &mask );
+	  
+	  if (nvmlShutdown()!=NVML_SUCCESS) hypre_printf("NVML SHUTDOWN CALL FAILED\n");
 	  hypre_printf("NUMA %d GID %d , NodeID %d NumaID %d running on device %d (RR=%d) of %d \n",getnuma(),myid,myNodeid,myNumaId,HYPRE_DEVICE,myNodeid%nDevices,nDevices);
+	  hypre_printf("I am using UUID %s\n",uuid);
+	  hypre_printf(" My mask is %lx %lx %lx \n",mask[0],mask[1],mask[2]);
 	  
 	}
 	
@@ -185,7 +221,7 @@ void MemPrefetch(const void *ptr,hypre_int device,cudaStream_t stream){
   PUSH_RANGE("MemPreFetchForce",4);
   /* Do a prefetch every time until a possible UM bug is fixed */
   if (size>0){
-     //PrintPointerAttributes(ptr);
+     PrintPointerAttributes(ptr);
      hypre_CheckErrorDevice(cudaMemPrefetchAsync(ptr,size,device,stream));
      hypre_CheckErrorDevice(cudaStreamSynchronize(stream));
      POP_RANGE;

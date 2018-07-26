@@ -35,7 +35,7 @@ HYPRE_Real    hypre_cimag( HYPRE_Complex value );
 #endif
 
 /* hypre_general.c */
-void hypre_init();
+void hypre_init(hypre_int device);
 void hypre_finalize();
 
 /* hypre_printf.c */

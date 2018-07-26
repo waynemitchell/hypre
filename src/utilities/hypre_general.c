@@ -19,7 +19,7 @@
  *****************************************************************************/
 
 void
-hypre_init()
+hypre_init(hypre_int device)
 {
    /*
    HYPRE_Int  num_procs, myid;
@@ -39,7 +39,7 @@ hypre_init()
 #endif
 
 #if defined(HYPRE_USE_GPU) || defined(HYPRE_USE_MANAGED)||defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
-   hypre_GPUInit(-1);
+   hypre_GPUInit(device);
 #endif
 
    /* hypre_InitMemoryDebug(myid); */

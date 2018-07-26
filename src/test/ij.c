@@ -376,7 +376,7 @@ main( hypre_int argc,
    /*-----------------------------------------------------------
     * Initialize some stuff
     *-----------------------------------------------------------*/
-
+   hypre_int device = hypre_presetGPUID();
    /* Initialize MPI */
    hypre_MPI_Init(&argc, &argv);
 
@@ -384,7 +384,7 @@ main( hypre_int argc,
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
    
    /* GPU Init stuff inside */
-   hypre_init();
+   hypre_init(device);
 
    //omp_set_default_device(0);
    //nvtxDomainHandle_t domain = nvtxDomainCreateA("Domain_A");

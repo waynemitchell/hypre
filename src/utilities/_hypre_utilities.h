@@ -600,7 +600,7 @@ hypre__offload_flag: 0 == OK; 1 == WRONG
 */
 
 
-#define TRACK_MEMORY_ALLOCATIONS
+//#define TRACK_MEMORY_ALLOCATIONS
 #if defined(TRACK_MEMORY_ALLOCATIONS)
 
 typedef struct {
@@ -637,6 +637,17 @@ void assert_check_host(void *ptr, char *file, HYPRE_Int line);
 #endif
 
 #else
+
+#if defined(HYPRE_USE_MANAGED)
+#define ASSERT_MANAGED(ptr)\
+  ( assert_check((ptr),__FILE__,__LINE__))
+
+#define ASSERT_HOST(ptr)\
+  ( assert_check_host((ptr),__FILE__,__LINE__))
+#else
+#define ASSERT_MANAGED(ptr)			
+#define ASSERT_HOST(ptr)
+#endif
 
 #if 0
 
@@ -1323,6 +1334,7 @@ inline void cublasAssert(cublasStatus_t code, const char *file, int line)
 
 #if defined(HYPRE_USE_MANAGED)||defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
 #include <cuda_runtime_api.h>
+hypre_int hypre_presetGPUID();
 void hypre_GPUInit(hypre_int use_device);
 void hypre_GPUFinalize();
 int VecScaleScalar(double *u, const double alpha,  int num_rows,cudaStream_t s);
@@ -1497,7 +1509,7 @@ HYPRE_Real    hypre_cimag( HYPRE_Complex value );
 #endif
 
 /* hypre_general.c */
-void hypre_init();
+void hypre_init(hypre_int device);
 void hypre_finalize();
 
 /* hypre_printf.c */
