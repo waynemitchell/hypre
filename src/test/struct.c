@@ -181,7 +181,7 @@ main( hypre_int argc,
    mv_InterfaceInterpreter* interpreter;
    HYPRE_MatvecFunctions matvec_fn;
    /* end lobpcg */
-
+   hypre_int device = hypre_presetGPUID();
    //HYPRE_Int device_level = -2;
    /*-----------------------------------------------------------
     * Initialize some stuff
@@ -192,7 +192,7 @@ main( hypre_int argc,
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
 
    /* GPU Init stuff inside */
-   hypre_init();
+   hypre_init(device);
 
 #ifdef HYPRE_DEBUG
    cegdb(&argc, &argv, myid);

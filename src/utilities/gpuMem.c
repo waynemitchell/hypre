@@ -31,10 +31,10 @@ struct hypre__global_struct hypre__global_handle = { .initd=0, .device=0, .devic
 hypre_int hypre_presetGPUID(){
   hypre_int nDevices;
   hypre_CheckErrorDevice(cudaGetDeviceCount(&nDevices));
-  if (nDevices>1){
+  if (nDevices==4){ // PBUGS NOT GONNA WORK ON SUMMIT AND MACHINES WITH GPU COUNTS OTHER THAN 4
     char *crank=getenv("OMPI_COMM_WORLD_LOCAL_RANK");
     hypre_int device = atoi(crank)%nDevices;
-    hypre_CheckErrorDevice(cudaSetDevice(atoi(crank)));
+    hypre_CheckErrorDevice(cudaSetDevice(device));
     hypre_printf("hypre_presetGPUID():: Device set to %d\n",device);
     char uuid[80];
     if (nvmlInit()!=NVML_SUCCESS) hypre_printf("NVML INIT CALL FAILED\n");
@@ -55,7 +55,7 @@ hypre_int hypre_presetGPUID(){
 /* Application passes device number it is using or -1 to let Hypre decide on which device to use */
 void hypre_GPUInit(hypre_int use_device){
   char pciBusId[80];
-  hypre_int myid;
+  HYPRE_Int myid;
   hypre_int nDevices;
   hypre_int device;
 #if defined(TRACK_MEMORY_ALLOCATIONS)
@@ -595,7 +595,7 @@ HYPRE_Int time_box = 0;
 static HYPRE_Int cuda_reduction_id_used[RAJA_MAX_REDUCE_VARS];
 CudaReductionBlockDataType* s_cuda_reduction_mem_block = 0;
   
-HYPRE_Int getCudaReductionId()
+hypre_int getCudaReductionId()
 {
    static HYPRE_Int first_time_called = 1;
    HYPRE_Int id;
@@ -665,7 +665,7 @@ void initCudaReductionMemBlock()
    }
 }
 
-CudaReductionBlockDataType* getCudaReductionMemBlock(HYPRE_Int id)
+CudaReductionBlockDataType* getCudaReductionMemBlock(hypre_int id)
 {
    //
    // For each reducer object, we want a chunk of managed memory that
@@ -696,14 +696,14 @@ CudaReductionBlockDataType* getCudaReductionMemBlock(HYPRE_Int id)
    return &(s_cuda_reduction_mem_block[id * block_offset]) ;
 }
 
-void releaseCudaReductionId(HYPRE_Int id)
+void releaseCudaReductionId(hypre_int id)
 {
    if ( id < RAJA_MAX_REDUCE_VARS ) {
       cuda_reduction_id_used[id] = 0;
    }
 }
 
-CudaReductionBlockDataType* getCPUReductionMemBlock(HYPRE_Int id)
+CudaReductionBlockDataType* getCPUReductionMemBlock(hypre_int id)
 {
    HYPRE_Int nthreads = 1;
 

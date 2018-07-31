@@ -62,11 +62,11 @@ main( hypre_int argc,
    /*-----------------------------------------------------------
     * Initialize some stuff
     *-----------------------------------------------------------*/
-
+   hypre_int device = hypre_presetGPUID();
    /* Initialize MPI */
    hypre_MPI_Init(&argc, &argv);
 
-   hypre_init();
+   hypre_init(device);
 /*
 #ifdef HYPRE_USE_OMP45
    HYPRE_OMPOffloadOn();

@@ -124,6 +124,8 @@ hypre_int main (hypre_int argc, char *argv[])
    HYPRE_ParVector x=0, y=0, z=0;
 
    HYPRE_ParVector interior_nodes;
+   
+    hypre_int device = hypre_presetGPUID();
 
    /* Initialize MPI */
    hypre_MPI_Init(&argc, &argv);
@@ -131,7 +133,7 @@ hypre_int main (hypre_int argc, char *argv[])
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid);
 
    /* GPU Init stuff inside */
-   hypre_init();
+   hypre_init(device);
    
    /* Set defaults */
    solver_id = 3;
