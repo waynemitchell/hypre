@@ -61,6 +61,12 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 
    HYPRE_Complex     *x_tmp_data, **x_buf_data;
    HYPRE_Complex     *x_local_data = hypre_VectorData(x_local);
+   hypre_int device=-1;
+   //hypre_CheckErrorDevice(cudaSetDevice(HYPRE_DEVICE));
+   //hypre_CheckErrorDevice(cudaGetDevice(&device));
+   //hypre_printf(" Devices %d %d \n",HYPRE_DEVICE,device);
+   //hypre_CheckErrorDevice(cudaPeekAtLastError());
+   //hypre_CheckErrorDevice(cudaDeviceSynchronize());
 
    /*---------------------------------------------------------------------
     *  Check for size compatibility.  ParMatvec returns ierr = 11 if
@@ -117,7 +123,8 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
    // num_vectors.
    hypre_ParCSRPersistentCommHandle *persistent_comm_handle;
 #endif
-
+   //hypre_CheckErrorDevice(cudaPeekAtLastError());
+   //hypre_CheckErrorDevice(cudaDeviceSynchronize());
    if ( use_persistent_comm )
    {
 #ifdef HYPRE_USING_PERSISTENT_COMM
@@ -147,7 +154,7 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
          x_buf_data[jv] = hypre_CTAlloc(HYPRE_Complex,  hypre_ParCSRCommPkgSendMapStart
                                         (comm_pkg,  num_sends), HYPRE_MEMORY_SHARED);
    }
-#define DEBUG_PACK_ON_DEVICE 1
+   //#define DEBUG_PACK_ON_DEVICE 1
    if ( num_vectors==1 )
    {
       HYPRE_Int begin = hypre_ParCSRCommPkgSendMapStart(comm_pkg, 0);
@@ -155,15 +162,26 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #ifdef HYPRE_USE_GPU
       PUSH_RANGE("PERCOMM2DEVICE",4);
 #ifdef HYPRE_USING_PERSISTENT_COMM
+      //ASSERT_MANAGED(persistent_comm_handle->send_data);
+      //ASSERT_MANAGED(x_local_data);
+#if defined(DEBUG_PACK_ON_DEVICE)
+      hypre_CheckErrorDevice(cudaPeekAtLastError());
+      hypre_CheckErrorDevice(cudaDeviceSynchronize());
+#endif
+      ASSERT_MANAGED(hypre_ParCSRCommPkgSendMapElmts(comm_pkg));
       PackOnDevice((HYPRE_Complex*)persistent_comm_handle->send_data,x_local_data,hypre_ParCSRCommPkgSendMapElmts(comm_pkg),begin,end,HYPRE_STREAM(4));
+#if defined(DEBUG_PACK_ON_DEVICE)
+      hypre_CheckErrorDevice(cudaPeekAtLastError());
+      hypre_CheckErrorDevice(cudaDeviceSynchronize());
+#endif
       //PrintPointerAttributes(persistent_comm_handle->send_data);
 #else
 #if defined(DEBUG_PACK_ON_DEVICE)
       hypre_CheckErrorDevice(cudaPeekAtLastError());
       hypre_CheckErrorDevice(cudaDeviceSynchronize());
-      //ASSERT_MANAGED(x_buf_data[0]);
-      //ASSERT_MANAGED(x_local_data);
-      //ASSERT_MANAGED(hypre_ParCSRCommPkgSendMapElmts(comm_pkg));
+      ASSERT_MANAGED(x_buf_data[0]);
+      ASSERT_MANAGED(x_local_data);
+      ASSERT_MANAGED(hypre_ParCSRCommPkgSendMapElmts(comm_pkg));
 #endif
       PackOnDevice((HYPRE_Complex*)x_buf_data[0],x_local_data,hypre_ParCSRCommPkgSendMapElmts(comm_pkg),begin,end,HYPRE_STREAM(4));
 #if defined(DEBUG_PACK_ON_DEVICE)

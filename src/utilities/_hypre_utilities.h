@@ -639,11 +639,8 @@ void assert_check_host(void *ptr, char *file, HYPRE_Int line);
 #else
 
 #if defined(HYPRE_USE_MANAGED)
-#define ASSERT_MANAGED(ptr)\
-  ( assert_check((ptr),__FILE__,__LINE__))
-
-#define ASSERT_HOST(ptr)\
-  ( assert_check_host((ptr),__FILE__,__LINE__))
+#define ASSERT_MANAGED(ptr)
+#define ASSERT_HOST(ptr)
 #else
 #define ASSERT_MANAGED(ptr)			
 #define ASSERT_HOST(ptr)
@@ -1154,6 +1151,7 @@ static const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #define PUSH_RANGE_PAYLOAD(name,cid,load)
 #define PUSH_RANGE_DOMAIN(name,cid,domainName)
+#define POP_RANGE_DOMAIN(dId)
 #endif
 
 /*BHEADER**********************************************************************
@@ -1345,7 +1343,9 @@ void VecScaleSplit(double *u, double *v, double *l1_norm, int num_rows,cudaStrea
 void CudaCompileFlagCheck();
 void BigToSmallCopy(hypre_int* tgt, const HYPRE_Int* src, hypre_int size,cudaStream_t s);
 cudaStream_t getstreamOlde(hypre_int i);
+#ifdef USE_NVTX
 nvtxDomainHandle_t getdomain(hypre_int i);
+#endif
 cudaEvent_t getevent(hypre_int i);
 void MemAdviseReadOnly(const void *ptr, hypre_int device);
 void MemAdviseUnSetReadOnly(const void *ptr, hypre_int device);
@@ -1380,7 +1380,9 @@ struct hypre__global_struct{
   cusparseHandle_t cusparse_handle;
   cusparseMatDescr_t cusparse_mat_descr;
   cudaStream_t streams[MAX_HGS_ELEMENTS];
+#ifdef USE_NVTX
   nvtxDomainHandle_t nvtx_domain;
+#endif
   hypre_int concurrent_managed_access;
   size_t memoryHWM;
 };

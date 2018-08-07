@@ -30,7 +30,9 @@ void VecScaleSplit(double *u, double *v, double *l1_norm, int num_rows,cudaStrea
 void CudaCompileFlagCheck();
 void BigToSmallCopy(hypre_int* tgt, const HYPRE_Int* src, hypre_int size,cudaStream_t s);
 cudaStream_t getstreamOlde(hypre_int i);
+#ifdef USE_NVTX
 nvtxDomainHandle_t getdomain(hypre_int i);
+#endif
 cudaEvent_t getevent(hypre_int i);
 void MemAdviseReadOnly(const void *ptr, hypre_int device);
 void MemAdviseUnSetReadOnly(const void *ptr, hypre_int device);
@@ -65,7 +67,9 @@ struct hypre__global_struct{
   cusparseHandle_t cusparse_handle;
   cusparseMatDescr_t cusparse_mat_descr;
   cudaStream_t streams[MAX_HGS_ELEMENTS];
+#ifdef USE_NVTX
   nvtxDomainHandle_t nvtx_domain;
+#endif
   hypre_int concurrent_managed_access;
   size_t memoryHWM;
 };

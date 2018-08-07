@@ -29,6 +29,7 @@ hypre_int ggc(hypre_int id);
 struct hypre__global_struct hypre__global_handle = { .initd=0, .device=0, .device_count=1,.memoryHWM=0};
 
 hypre_int hypre_presetGPUID(){
+  return -1;
   hypre_int nDevices;
   hypre_CheckErrorDevice(cudaGetDeviceCount(&nDevices));
   if (nDevices==4){ // PBUGS NOT GONNA WORK ON SUMMIT AND MACHINES WITH GPU COUNTS OTHER THAN 4
@@ -111,6 +112,7 @@ void hypre_GPUInit(hypre_int use_device){
 	  hypre_int domain_devices=nDevices/2; /* Again hardwired for 2 NUMA domains */
 	  HYPRE_DEVICE = getnuma()*2+myNumaId%domain_devices;
 	  HYPRE_DEVICE = myNodeid%nDevices;
+	  //HYPRE_DEVICE=0;
 	  hypre_CheckErrorDevice(cudaSetDevice(HYPRE_DEVICE));
 	  hypre_printf("WARNING:: Code running without mpibind\n");
 	  char uuid[80];
@@ -147,8 +149,9 @@ void hypre_GPUInit(hypre_int use_device){
     printf("Set OMP Default device to %d \n",HYPRE_DEVICE);
 #endif /* defined(HYPRE_USING_OPENMP_OFFLOAD) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD */
       /* Create NVTX domain for all the nvtx calls in HYPRE */
+#ifdef USE_NVTX
       HYPRE_DOMAIN=nvtxDomainCreateA("Hypre");
-      
+#endif
       /* Initialize streams */
       hypre_int jj;
       for(jj=0;jj<MAX_HGS_ELEMENTS;jj++)
@@ -166,6 +169,9 @@ void hypre_GPUInit(hypre_int use_device){
     cublasErrchk(cublasCreate(&(HYPRE_CUBLAS_HANDLE)));
     cublasErrchk(cublasSetStream(HYPRE_CUBLAS_HANDLE,HYPRE_STREAM(4)));
     if (!checkDeviceProps()) hypre_printf("WARNING:: Concurrent memory access not allowed\n");
+    hypre_int sdev=-1;
+    hypre_CheckErrorDevice(cudaGetDevice(&sdev));
+    hypre_printf("END OF GPUINIT %d %d \n",HYPRE_DEVICE,sdev);
     /* Check if the arch flags used for compiling the cuda kernels match the device */
 #ifdef HYPRE_USE_GPU
     CudaCompileFlagCheck();
@@ -305,7 +311,7 @@ cudaStream_t getstreamOlde(hypre_int i){
   fprintf(stderr,"ERROR in HYPRE_STREAM in utilities/gpuMem.c %d is greater than MAXSTREAMS = %d\n Returning default stream",i,MAXSTREAMS);
   return 0;
 }
-
+#ifdef USE_NVTX
 nvtxDomainHandle_t getdomain(hypre_int i){
     static hypre_int firstcall=1;
     const hypre_int MAXDOMAINS=1;
@@ -318,7 +324,7 @@ nvtxDomainHandle_t getdomain(hypre_int i){
     fprintf(stderr,"ERROR in getdomain in utilities/gpuMem.c %d  is greater than MAXDOMAINS = %d \n Returning default domain",i,MAXDOMAINS);
     return NULL;
   }
-
+#endif
 cudaEvent_t getevent(hypre_int i){
   static hypre_int firstcall=1;
   const hypre_int MAXEVENTS=10;

@@ -250,11 +250,8 @@ void assert_check_host(void *ptr, char *file, HYPRE_Int line);
 #else
 
 #if defined(HYPRE_USE_MANAGED)
-#define ASSERT_MANAGED(ptr)\
-  ( assert_check((ptr),__FILE__,__LINE__))
-
-#define ASSERT_HOST(ptr)\
-  ( assert_check_host((ptr),__FILE__,__LINE__))
+#define ASSERT_MANAGED(ptr)
+#define ASSERT_HOST(ptr)
 #else
 #define ASSERT_MANAGED(ptr)			
 #define ASSERT_HOST(ptr)

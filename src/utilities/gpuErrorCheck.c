@@ -7,7 +7,7 @@ void CheckError(cudaError_t const err, const char* file, char const* const fun, 
     if (err)
     {
       printf("CUDA Error Code[%d]: %s\n %s(%s) Line:%d\n", err, cudaGetErrorString(err), file, fun, line);
-      HYPRE_Int *p = NULL; *p = 1;
+      //HYPRE_Int *p = NULL; *p = 1;
     }
 }
 #endif //defined(HYPRE_MEMORY_GPU) || defined(HYPRE_USE_MANAGED)

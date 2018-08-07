@@ -849,7 +849,9 @@ hypre_CSRMatrixMatvecDevice( HYPRE_Complex    alpha,
     hypre_int jj;
     for(jj=0;jj<5;jj++)
       s[jj]=HYPRE_STREAM(jj);
+#ifdef USE_NVTX
     nvtxNameCudaStreamA(s[4], "HYPRE_COMPUTE_STREAM");
+#endif
     hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
     myid++;
     POP_RANGE;
@@ -886,7 +888,7 @@ hypre_CSRMatrixMatvecDeviceBIGINT( HYPRE_Complex    alpha,
 		       hypre_Vector    *y,
 		       HYPRE_Int offset )
 {
-
+#ifdef HYPRE_BIGINT
   static cusparseHandle_t handle;
   static cusparseMatDescr_t descr;
   static HYPRE_Int FirstCall=1;
@@ -967,7 +969,7 @@ hypre_CSRMatrixMatvecDeviceBIGINT( HYPRE_Complex    alpha,
   hypre_CheckErrorDevice(cudaStreamSynchronize(s[4]));
   }
   POP_RANGE;
-  
+#endif
   return 0;
   
 }
