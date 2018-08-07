@@ -101,7 +101,11 @@ static inline HYPRE_Int hypre_RedefMemLocation(HYPRE_Int location)
 
    if (location == HYPRE_MEMORY_HOST_PINNED)
    {
+#if defined(HYPRE_GPU_USE_PINNED)
       return HYPRE_MEMORY_HOST_PINNED;
+#else
+      return HYPRE_MEMORY_SHARED;
+#endif
    }
 
    return HYPRE_MEMORY_UNSET;

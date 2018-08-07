@@ -29,7 +29,7 @@ hypre_int ggc(hypre_int id);
 struct hypre__global_struct hypre__global_handle = { .initd=0, .device=0, .device_count=1,.memoryHWM=0};
 
 hypre_int hypre_presetGPUID(){
-  return -1;
+  //return -1;
   hypre_int nDevices;
   hypre_CheckErrorDevice(cudaGetDeviceCount(&nDevices));
   if (nDevices==4){ // PBUGS NOT GONNA WORK ON SUMMIT AND MACHINES WITH GPU COUNTS OTHER THAN 4

@@ -763,6 +763,7 @@ HYPRE_Real   hypre_SeqVectorInnerProdDevice( hypre_Vector *x,
   
 }
 void hypre_SeqVectorPrefetchToDevice(hypre_Vector *x){
+  return;
   if (hypre_VectorSize(x)==0) return;
 #if defined(TRACK_MEMORY_ALLOCATIONS)
   ASSERT_MANAGED(hypre_VectorData(x));

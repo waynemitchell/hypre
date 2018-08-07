@@ -71,12 +71,12 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
       case HYPRE_COMM_PKG_JOB_COMPLEX:
          if (!send_data)
          {
-	   //send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends), HYPRE_MEMORY_HOST_PINNED);
-	   send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends),HYPRE_MEMORY_SHARED);
+	   send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends), HYPRE_MEMORY_HOST_PINNED);
+	   //send_data = hypre_TAlloc(HYPRE_Complex, hypre_ParCSRCommPkgSendMapStart(comm_pkg, num_sends),HYPRE_MEMORY_SHARED);
          }
          if (!recv_data)
          {
-            recv_data = hypre_TAlloc(HYPRE_Complex,  hypre_ParCSRCommPkgRecvVecStart(comm_pkg,  num_recvs), HYPRE_MEMORY_SHARED);  
+            recv_data = hypre_TAlloc(HYPRE_Complex,  hypre_ParCSRCommPkgRecvVecStart(comm_pkg,  num_recvs), HYPRE_MEMORY_HOST_PINNED);  
          }
          for (i = 0; i < num_recvs; ++i)
          {
@@ -104,7 +104,7 @@ hypre_ParCSRPersistentCommHandleCreate( HYPRE_Int job,
          }
          if (!send_data)
          {
-            send_data = hypre_TAlloc(HYPRE_Complex,  hypre_ParCSRCommPkgRecvVecStart(comm_pkg,  num_recvs), HYPRE_MEMORY_SHARED);  
+            send_data = hypre_TAlloc(HYPRE_Complex,  hypre_ParCSRCommPkgRecvVecStart(comm_pkg,  num_recvs), HYPRE_MEMORY_HOST_PINNED);  
          }
          for (i = 0; i < num_sends; ++i)
          {

@@ -190,9 +190,9 @@ hypre_ParCSRMatrixMatvecOutOfPlace( HYPRE_Complex       alpha,
 #endif
 #endif
       POP_RANGE;
-      SetAsyncMode(1);
-      hypre_CheckErrorDevice(cudaPeekAtLastError());
-      hypre_CheckErrorDevice(cudaDeviceSynchronize());
+      SetAsyncMode(0); // This used to be 1
+      //hypre_CheckErrorDevice(cudaPeekAtLastError());
+      //hypre_CheckErrorDevice(cudaDeviceSynchronize());
       hypre_CSRMatrixMatvecOutOfPlace( alpha, diag, x_local, beta, b_local, y_local, 0);
       //hypre_SeqVectorUpdateHost(y_local);
       //hypre_SeqVectorUpdateHost(x_local);
