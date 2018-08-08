@@ -89,7 +89,15 @@ extern "C"{
     }
   }
   void PackOnDevice(HYPRE_Complex *send_data,HYPRE_Complex *x_local_data, HYPRE_Int *send_map, HYPRE_Int begin,HYPRE_Int end,cudaStream_t s){
+    // const int cutoff=1024;
+    // if ((end-begin)<=cutoff){
+    //   PUSH_RANGE("PackOnHost",3);
+    //   for(int i=begin;i<end;i++) send_data[i-begin]=x_local_data[send_map[i]];
+    //   POP_RANGE;
+    //   return;
+    // }
     if ((end-begin)<=0) return;
+    PUSH_RANGE_PAYLOAD("PackOnDevice",3,(end-begin));
     hypre_int tpb=64;
     hypre_int num_blocks=(end-begin)/tpb+1;
 #ifdef CATCH_LAUNCH_ERRORS
@@ -105,6 +113,8 @@ extern "C"{
 #ifndef HYPRE_GPU_USE_PINNED
     MemPrefetchSized((void*)send_data,(end-begin)*sizeof(HYPRE_Complex),cudaCpuDeviceId,s);
 #endif
+    POP_RANGE;
+    //cudaStreamSynchronize(s);
     POP_RANGE;
     //hypre_CheckErrorDevice(cudaStreamSynchronize(s));
   }

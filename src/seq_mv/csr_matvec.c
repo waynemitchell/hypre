@@ -41,15 +41,23 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
    PUSH_RANGE_PAYLOAD("MATVEC",0, hypre_CSRMatrixNumRows(A));
 #ifdef HYPRE_BIGINT
    HYPRE_Int ret=hypre_CSRMatrixMatvecDeviceBIGINT( alpha,A,x,beta,b,y,offset);
-#else
-   HYPRE_Int ret=hypre_CSRMatrixMatvecDevice( alpha,A,x,beta,b,y,offset);
-#endif
    POP_RANGE;
-  return ret;
+   return ret;
+#else
+   if (hypre_CSRMatrixNumNonzeros(A)>8192){
+     HYPRE_Int ret=hypre_CSRMatrixMatvecDevice( alpha,A,x,beta,b,y,offset);
+     POP_RANGE;
+     return ret;
+   } else {
+     hypre_CheckErrorDevice(cudaStreamSynchronize(HYPRE_STREAM(4)));
+   }
+#endif
+#endif
+
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_MATVEC] += hypre_MPI_Wtime() - time_begin;
 #endif
-#endif
+
 
 #if defined(HYPRE_USING_OPENMP_OFFLOAD) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
    PUSH_RANGE_PAYLOAD("MATVEC-OMP",0, hypre_CSRMatrixNumRows(A));
