@@ -27,13 +27,13 @@ extern "C"{
 extern "C"{
   void VecScale(HYPRE_Complex *u, HYPRE_Complex *v, HYPRE_Complex *l1_norm, hypre_int num_rows,cudaStream_t s){
     PUSH_RANGE_PAYLOAD("VECSCALE",1,num_rows);
-    const hypre_int tpb=64;
+    const hypre_int tpb=256;
     hypre_int num_blocks=num_rows/tpb+1;
 #ifdef CATCH_LAUNCH_ERRORS
     hypre_CheckErrorDevice(cudaPeekAtLastError());
     hypre_CheckErrorDevice(cudaDeviceSynchronize());
 #endif
-    MemPrefetchSized(l1_norm,num_rows*sizeof(HYPRE_Complex),HYPRE_DEVICE,s);
+    //MemPrefetchSized(l1_norm,num_rows*sizeof(HYPRE_Complex),HYPRE_DEVICE,s);
     VecScaleKernel<<<num_blocks,tpb,0,s>>>(u,v,l1_norm,num_rows);
 #ifdef CATCH_LAUNCH_ERRORS    
     hypre_CheckErrorDevice(cudaPeekAtLastError());
