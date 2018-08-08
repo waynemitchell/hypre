@@ -250,6 +250,7 @@ hypre_UnifiedMalloc(size_t size, HYPRE_Int zeroinit)
 #if HYPRE_MEMORY_ENV != HOST_MEM_ONLY
    /* with UM, managed memory alloc */
    hypre_CheckErrorDevice( cudaMallocManaged(&ptr, size + sizeof(size_t)*MEM_PAD_LEN, CUDAMEMATTACHTYPE) );
+   hypre_CheckErrorDevice(cudaMemAdvise(ptr,size+sizeof(size_t)*MEM_PAD_LEN,cudaMemAdviseSetPreferredLocation,HYPRE_DEVICE));
    size_t *sp = (size_t*) ptr;
    sp[0] = size;
    ptr = (void*) (&sp[MEM_PAD_LEN]);

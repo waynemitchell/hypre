@@ -266,6 +266,7 @@ hypre_PCGSolve( void *pcg_vdata,
                 void *b,
                 void *x         )
 {
+  PUSH_RANGE("PCG_Solve",1);
    hypre_PCGData  *pcg_data     =  (hypre_PCGData *)pcg_vdata;
    hypre_PCGFunctions *pcg_functions = pcg_data->functions;
 
@@ -721,7 +722,7 @@ hypre_PCGSolve( void *pcg_vdata,
       (pcg_data -> rel_residual_norm) = sqrt(i_prod/bi_prod);
    else /* actually, we'll never get here... */
       (pcg_data -> rel_residual_norm) = 0.0;
-
+   POP_RANGE;
    return hypre_error_flag;
 }
 

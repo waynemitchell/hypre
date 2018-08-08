@@ -50,6 +50,7 @@ void cudaSafeFree(void *ptr,int padding)
     raise(SIGABRT);
 #endif /* ABORT_ON_RAW_POINTER */
     free(ptr); /* Free the nonManaged pointer */
+    POP_RANGE;
     return;
   }
   if (ptr_att.isManaged){
@@ -62,6 +63,7 @@ void cudaSafeFree(void *ptr,int padding)
     if (PointerAttributes(ptr)!=PointerAttributes(sptr)){
       //fprintf(stderr,"ERROR IN Pointer for freeing %p %p\n",ptr,sptr);
       hypre_CheckErrorDevice(cudaFree(ptr)); 
+      POP_RANGE;
       return;
     }
     hypre_CheckErrorDevice(cudaFree(sptr)); 

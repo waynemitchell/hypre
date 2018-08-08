@@ -378,6 +378,7 @@ hypre_ParCSRMatrixMatvecT( HYPRE_Complex       alpha,
                            HYPRE_Complex       beta,
                            hypre_ParVector    *y )
 {
+  PUSH_RANGE("ParCSRMatrixMatvecT",0);
    hypre_ParCSRCommHandle **comm_handle;
    hypre_ParCSRCommPkg *comm_pkg = hypre_ParCSRMatrixCommPkg(A);
    hypre_CSRMatrix     *diag = hypre_ParCSRMatrixDiag(A);
@@ -615,7 +616,7 @@ hypre_ParCSRMatrixMatvecT( HYPRE_Complex       alpha,
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_PACK_UNPACK] += hypre_MPI_Wtime();
 #endif
-
+   POP_RANGE;
    return ierr;
 }
 

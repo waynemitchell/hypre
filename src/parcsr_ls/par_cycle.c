@@ -38,7 +38,7 @@ hypre_BoomerAMGCycle( void              *amg_vdata,
                    hypre_ParVector  **U_array   )
 {
    hypre_ParAMGData *amg_data = (hypre_ParAMGData*) amg_vdata;
-
+   PUSH_RANGE("BoomerAMGCycle",2);
    HYPRE_Solver *smoother;
    /* Data Structure variables */
 
@@ -723,5 +723,6 @@ hypre_BoomerAMGCycle( void              *amg_vdata,
         hypre_ParVectorDestroy(Utemp);
    }
    //printf("HYPRE_BoomerAMGCycle END\n");
+   POP_RANGE;
    return(Solve_err_flag);
 }

@@ -2377,7 +2377,7 @@ HYPRE_Int  hypre_BoomerAMGRelax( hypre_ParCSRMatrix *A,
          /*-----------------------------------------------------------------
           * Copy f into temporary vector.
           *-----------------------------------------------------------------*/
-         PUSH_RANGE("RELAX",4);
+         PUSH_RANGE("RELAX-1",4);
 #ifdef HYPRE_USE_GPU
            hypre_SeqVectorPrefetchToDevice(hypre_ParVectorLocalVector(Vtemp));
            hypre_SeqVectorPrefetchToDevice(hypre_ParVectorLocalVector(f));
@@ -4301,7 +4301,7 @@ HYPRE_Int hypre_GaussElimSolve (hypre_ParAMGData *amg_data, HYPRE_Int level, HYP
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_GS_ELIM_SOLVE] -= hypre_MPI_Wtime();
 #endif
- 
+   PUSH_RANGE("GAUSSELIM",3);
    hypre_ParCSRMatrix *A = hypre_ParAMGDataAArray(amg_data)[level];
    HYPRE_Int  n        = hypre_CSRMatrixNumRows(hypre_ParCSRMatrixDiag(A));
    HYPRE_Int  error_flag = 0;
@@ -4366,7 +4366,7 @@ HYPRE_Int hypre_GaussElimSolve (hypre_ParAMGData *amg_data, HYPRE_Int level, HYP
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_GS_ELIM_SOLVE] += hypre_MPI_Wtime();
 #endif
-
+   POP_RANGE;
    return hypre_error_flag;
 }
 

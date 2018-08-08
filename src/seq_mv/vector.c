@@ -270,8 +270,10 @@ HYPRE_Int
 hypre_SeqVectorSetConstantValues( hypre_Vector *v,
                                   HYPRE_Complex value )
 {
+  PUSH_RANGE("SeqVecConstValues",1);
 #ifdef HYPRE_USE_GPU
   VecSet(hypre_VectorData(v),hypre_VectorSize(v),value,HYPRE_STREAM(4));
+  POP_RANGE;
   return 0;
 #endif
 
@@ -318,6 +320,7 @@ hypre_SeqVectorSetConstantValues( hypre_Vector *v,
    //SyncVectorToHost(v);
    //UpdateHRC(v);
 #endif  
+   POP_RANGE;
    return ierr;
 }
 
