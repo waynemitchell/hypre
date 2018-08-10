@@ -294,7 +294,7 @@ hypre_MAllocWithInit(size_t size, HYPRE_Int zeroinit, HYPRE_Int location)
    {
       return NULL;
    }
-
+   PUSH_RANGE_PAYLOAD("MALLOC",4,size);
    void *ptr = NULL;
 
    location = hypre_RedefMemLocation(location);
@@ -326,7 +326,7 @@ hypre_MAllocWithInit(size_t size, HYPRE_Int zeroinit, HYPRE_Int location)
    {
       hypre_OutOfMemory(size);
    }
-
+   POP_RANGE;
    return ptr;
 }
 

@@ -689,10 +689,13 @@ HYPRE_Int hypre_CSRMatrixGetLoadBalancedPartitionEnd(hypre_CSRMatrix *A)
 }
 #ifdef HYPRE_USE_MANAGED
 void hypre_CSRMatrixPrefetchToDevice(hypre_CSRMatrix *A){
+  if (A->on_device) return;
   if (hypre_CSRMatrixNumNonzeros(A)==0) return;
 
-  PUSH_RANGE_PAYLOAD("hypre_CSRMatrixPrefetchToDevice",0,hypre_CSRMatrixNumNonzeros(A));
-  if ((!A->on_device)&&(hypre_CSRMatrixNumNonzeros(A)>8192)){
+  //printf("ARRAY SIZE %d \n",hypre_CSRMatrixNumNonzeros(A));
+  if (hypre_CSRMatrixNumNonzeros(A)>HYPRE_HOST_CUTOFF){
+    //printf("PREFETCH %d\n",hypre_CSRMatrixNumNonzeros(A));
+    PUSH_RANGE_PAYLOAD("hypre_CSRMatrixPrefetchToDevice",0,hypre_CSRMatrixNumNonzeros(A));
     //printf("Pointer type %d value = %p\n",PointerAttributes((hypre_CSRMatrixI(A))),hypre_CSRMatrixI(A));
 #if defined(TRACK_MEMORY_ALLOCATIONS)
     ASSERT_MANAGED(hypre_CSRMatrixData(A));
@@ -710,8 +713,30 @@ void hypre_CSRMatrixPrefetchToDevice(hypre_CSRMatrix *A){
 #else
     A->on_device=1;
 #endif
+    POP_RANGE;
+  } else {
+    //printf("ADVISE %d\n",hypre_CSRMatrixNumNonzeros(A));
+    PUSH_RANGE("CSRMAdvise",1);
+    hypre_CheckErrorDevice(
+			   cudaMemAdvise(hypre_CSRMatrixData(A),
+					 hypre_CSRMatrixNumNonzeros(A)*sizeof(HYPRE_Complex),
+					 cudaMemAdviseSetPreferredLocation,cudaCpuDeviceId));
+    hypre_CheckErrorDevice(
+			   cudaMemAdvise(hypre_CSRMatrixI(A),
+					 (hypre_CSRMatrixNumRows(A)+1)*sizeof(HYPRE_Int),
+					 cudaMemAdviseSetPreferredLocation,cudaCpuDeviceId));
+    hypre_CheckErrorDevice(
+			   cudaMemAdvise(hypre_CSRMatrixJ(A),
+					 hypre_CSRMatrixNumNonzeros(A)*sizeof(HYPRE_Int),
+					 cudaMemAdviseSetPreferredLocation,cudaCpuDeviceId));
+#ifdef HYPRE_USING_OPENMP_OFFLOAD
+    A->on_device=0; // Should be 1 for CUDA code. 0 for OMP for now
+#else
+    A->on_device=1;
+#endif
+    POP_RANGE;
   }
-  POP_RANGE;
+
 }
 void hypre_CSRMatrixPrefetchToDeviceBIGINT(hypre_CSRMatrix *A){
   if (hypre_CSRMatrixNumNonzeros(A)==0) return;

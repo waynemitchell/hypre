@@ -38,18 +38,22 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
    HYPRE_Real time_begin = hypre_MPI_Wtime();
 #endif
 #ifdef HYPRE_USE_GPU
-   PUSH_RANGE_PAYLOAD("MATVEC",0, hypre_CSRMatrixNumRows(A));
+   
 #ifdef HYPRE_BIGINT
+   PUSH_RANGE_PAYLOAD("MATVECBIG",0, hypre_CSRMatrixNumRows(A));
    HYPRE_Int ret=hypre_CSRMatrixMatvecDeviceBIGINT( alpha,A,x,beta,b,y,offset);
    POP_RANGE;
    return ret;
 #else
-   if (hypre_CSRMatrixNumNonzeros(A)>8192){
+   if (hypre_CSRMatrixNumNonzeros(A)>HYPRE_HOST_CUTOFF){
+     PUSH_RANGE_PAYLOAD("MATVECD",0, hypre_CSRMatrixNumRows(A));
      HYPRE_Int ret=hypre_CSRMatrixMatvecDevice( alpha,A,x,beta,b,y,offset);
      POP_RANGE;
      return ret;
    } else {
+     PUSH_RANGE_PAYLOAD("MATVECHOST",1, hypre_CSRMatrixNumNonzeros(A));
      hypre_CheckErrorDevice(cudaStreamSynchronize(HYPRE_STREAM(4)));
+     hypre_CSRMatrixPrefetchToDevice(A);
    }
 #endif
 #endif
@@ -141,7 +145,7 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 #ifdef HYPRE_PROFILE
       hypre_profile_times[HYPRE_TIMER_ID_MATVEC] += hypre_MPI_Wtime() - time_begin;
 #endif
-
+      POP_RANGE;
       return ierr;
    }
 
@@ -436,6 +440,7 @@ hypre_CSRMatrixMatvecOutOfPlace( HYPRE_Complex    alpha,
 #ifdef HYPRE_PROFILE
    hypre_profile_times[HYPRE_TIMER_ID_MATVEC] += hypre_MPI_Wtime() - time_begin;
 #endif
+   POP_RANGE;
    return ierr;
 }
 

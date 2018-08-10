@@ -26,7 +26,7 @@ size_t memsize(const void *ptr){
 hypre_int ggc(hypre_int id);
 
 /* Global struct that holds device,library handles etc */
-struct hypre__global_struct hypre__global_handle = { .initd=0, .device=0, .device_count=1,.memoryHWM=0};
+struct hypre__global_struct hypre__global_handle = { .initd=0, .device=0, .device_count=1,.memoryHWM=0, .hostCutoff=0 };
 
 hypre_int hypre_presetGPUID(){
   //return -1;

@@ -72,6 +72,7 @@ struct hypre__global_struct{
 #endif
   hypre_int concurrent_managed_access;
   size_t memoryHWM;
+  hypre_int hostCutoff;
 };
 
 extern struct hypre__global_struct hypre__global_handle ;
@@ -90,7 +91,7 @@ extern struct hypre__global_struct hypre__global_handle ;
 #define HYPRE_CUSPARSE_MAT_DESCR hypre__global_handle.cusparse_mat_descr
 #define HYPRE_GPU_CMA hypre__global_handle.concurrent_managed_access
 #define HYPRE_GPU_HWM hypre__global_handle.memoryHWM
-
+#define HYPRE_HOST_CUTOFF hypre__global_handle.hostCutoff
 #endif /* HYPRE_USE_MANAGED */
 
 typedef struct node {
