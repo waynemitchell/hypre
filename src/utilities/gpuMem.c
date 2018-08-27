@@ -143,10 +143,10 @@ void hypre_GPUInit(hypre_int use_device){
       HYPRE_DEVICE = use_device;
       hypre_CheckErrorDevice(cudaSetDevice(HYPRE_DEVICE));
     }
-    printf("GPU Init called \n");
+    //printf("GPU Init called \n");
 #if defined(HYPRE_USING_OPENMP_OFFLOAD) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD)
     omp_set_default_device(HYPRE_DEVICE);
-    printf("Set OMP Default device to %d \n",HYPRE_DEVICE);
+    //printf("Set OMP Default device to %d \n",HYPRE_DEVICE);
 #endif /* defined(HYPRE_USING_OPENMP_OFFLOAD) || defined(HYPRE_USING_MAPPED_OPENMP_OFFLOAD */
       /* Create NVTX domain for all the nvtx calls in HYPRE */
 #ifdef USE_NVTX
@@ -171,7 +171,7 @@ void hypre_GPUInit(hypre_int use_device){
     if (!checkDeviceProps()) hypre_printf("WARNING:: Concurrent memory access not allowed\n");
     hypre_int sdev=-1;
     hypre_CheckErrorDevice(cudaGetDevice(&sdev));
-    hypre_printf("END OF GPUINIT %d %d \n",HYPRE_DEVICE,sdev);
+    //hypre_printf("END OF GPUINIT %d %d \n",HYPRE_DEVICE,sdev);
     /* Check if the arch flags used for compiling the cuda kernels match the device */
 #ifdef HYPRE_USE_GPU
     CudaCompileFlagCheck();

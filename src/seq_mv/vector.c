@@ -825,6 +825,7 @@ void hypre_SeqVectorMapToDevice(hypre_Vector *x){
 #endif
       //}
     x->mapped=1;
+    x->mapped_size=x->size;
     x->pcopy=x->data;
     //if (omp_target_is_present(x->data,0)) printf("Successfully mapped region %p %p\n",x->data,x->data+x->size);
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
@@ -850,7 +851,7 @@ void hypre_SeqVectorUnMapFromDevice(hypre_Vector *x){
   //#pragma omp target exit data map(from:x[0:0])
   //if ( hypre_VectorOwnsData(x)){
 
-// This should be a delet
+
 #ifdef ALLOCMAP
 #pragma omp target exit data map(delete:x->data[0:x->size])  if (x->size>0)
 #else
@@ -868,20 +869,25 @@ void hypre_SeqVectorUpdateDevice(hypre_Vector *x){
   if (x==NULL) return;
   if (!x->mapped) {
      return;
-     hypre_printf("ERROR:: Updating to devie from unmapped vector\n");
+     hypre_printf("ERROR:: Updating to device from unmapped vector\n");
     double *gah=NULL; *gah = -sqrt(-1.0);
     hypre_printf("GAH %g \n",*gah);
     hypre_SeqVectorMapToDevice(x);
 }
   if (x->pcopy!=x->data) {
     hypre_printf("WARNING UPDATE DEVICE :: Host pointer has changed since intial map\n");
+#ifdef TRACK_MEMORY_ALLOCATIONS
     pattr_t *s=patpush(x->pcopy,NULL);
     hypre_printf("Original %p from %s %d \n",x->pcopy,s->file,s->line);
     s=patpush(x->data,NULL);
     hypre_printf("Current %p from %s %d \n",x->data,s->file,s->line);
     double *gah=NULL; *gah = -sqrt(-1.0);
     hypre_printf("GAH %g \n",*gah);
+#endif
   }
+  if (x->mapped_size<x->size){
+    hypre_printf("ERROR :: hypre_SeqVectorUpdateDevice:: Mapped size %d is less than current size = %d \n",x->mapped_size,x->size);
+   }
 #pragma omp target update to(x->data[0:x->size]) if (x->size>0)
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
   SetDRC(x);
@@ -891,39 +897,43 @@ void hypre_SeqVectorUpdateDevice(hypre_Vector *x){
 void hypre_SeqVectorUpdateHost(hypre_Vector *x){
    if (x==NULL) return; 
    if (!x->mapped) {
+     /* Updates of unmapped vectors is a no-op for now to account for callpaths which are entireley host side */
      return;
-     hypre_printf("ERROR:: Updating to host from unmapped vector\n");
-     pattr_t *s=patpush(x->data,NULL);
-     hypre_printf("Vec data  %p from %s %d \n",x->data,s->file,s->line);
-     s=patpush(x,NULL);
-     hypre_printf("Vector  %p from %s %d \n",x,s->file,s->line);
+     
+     /* pattr_t *s=patpush(x->data,NULL); */
+     /* hypre_printf("Vec data  %p from %s %d \n",x->data,s->file,s->line); */
+     /* s=patpush(x,NULL); */
+     /* hypre_printf("Vector  %p from %s %d \n",x,s->file,s->line); */
     //double *gah=NULL; *gah = -sqrt(-1.0);
     //hypre_printf("GAH %g \n",*gah);
   }
    if (x->pcopy!=x->data) {
-     hypre_printf("ERROR :: UPDATE DEVICE :: Host pointer has changed since intial map\n");
-     pattr_t *s=patpush(x->pcopy,NULL);
-    hypre_printf("Original %p from %s %d \n",x->pcopy,s->file,s->line);
-    s=patpush(x->data,NULL);
-    hypre_printf("Current %p from %s %d \n",x->data,s->file,s->line);
-    double *gah=NULL; *gah = -sqrt(-1.0);
-    hypre_printf("GAH %g \n",*gah);
+     hypre_printf("ERROR :: hypre_SeqVectorUpdateHost :: Host pointer has changed since intial map\n");
+     /* pattr_t *s=patpush(x->pcopy,NULL); */
+    /* hypre_printf("Original %p from %s %d \n",x->pcopy,s->file,s->line); */
+    /* s=patpush(x->data,NULL); */
+    /* hypre_printf("Current %p from %s %d \n",x->data,s->file,s->line); */
+    /* double *gah=NULL; *gah = -sqrt(-1.0); */
+    /* hypre_printf("GAH %g \n",*gah); */
   }
+   if (x->mapped_size<x->size){
+     hypre_printf("ERROR :: hypre_SeqVectorUpdateHost:: Mapped size %d is less than current size = %d \n",x->mapped_size,x->size);
+   }
    /* This a a fix for the intermittent failure of the pragma update for the elast.6 problem
       in TEST_ij.
    */
-  omp_target_memcpy(x->data,get_device_pointer(x->data),
-  		    x->size*sizeof(double),0,0,
-  		    omp_get_initial_device(),0);
+  /* omp_target_memcpy(x->data,get_device_pointer(x->data), */
+  /* 		    x->size*sizeof(double),0,0, */
+  /* 		    omp_get_initial_device(),0); */
   
-  SetHRC(x);
-  return;
+  /* SetHRC(x); */
+  /* return; */
 
-  /* for (int i=0;i<x->size;i++){  */
-  /*    #pragma omp target update from(x->data[i:1])  */
+  /* for (int i=0;i<x->size;i++){ */
+  /*    #pragma omp target update from(x->data[i:1]) */
   /*  } */
   /*    SetHRC(x); */
-   // return;
+  /*  return; */
 
 #pragma omp target update from(x->data[0:x->size]) 
   SetHRC(x);

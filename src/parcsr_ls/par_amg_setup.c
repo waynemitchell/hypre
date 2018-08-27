@@ -2102,6 +2102,7 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                   hypre_TFree(hypre_VectorData(Vtemp_local), HYPRE_MEMORY_SHARED); 
                   hypre_VectorSize(Vtemp_local) = local_P_sz; 
                   hypre_VectorData(Vtemp_local) = hypre_CTAlloc(HYPRE_Complex, local_P_sz, HYPRE_MEMORY_SHARED);
+		  hypre_SeqVectorMapToDevice(Vtemp_local);
 		  //printf("AND WE HAVE IT %d %p \n",hypre_ParVectorLocalVector(Vtemp)->mapped,hypre_VectorData(Vtemp_local) );
                   if (Ztemp)
                   {

@@ -224,9 +224,10 @@ typedef struct
 #endif
 #ifdef HYPRE_USING_MAPPED_OPENMP_OFFLOAD
   HYPRE_Complex *pcopy;
-  HYPRE_Int mapped;
-  HYPRE_Int drc; /* device ref count */
-  HYPRE_Int hrc; /* host ref count */
+  hypre_int mapped;
+  hypre_int drc; /* device ref count */
+  hypre_int hrc; /* host ref count */
+  HYPRE_Int mapped_size;
 #endif
 
 } hypre_Vector;
