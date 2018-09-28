@@ -1588,7 +1588,7 @@ then
 		LDFLAGS+="-L /usr/local/cuda/lib64 -lcusparse -lcudart -lcublas -lnvToolsExt"
 		AC_DEFINE(HYPRE_USING_NVCC, 1, [Using nvcc compiler])
 		NVCCFLAGS="-O3 -arch=sm_60  -ccbin=xlc  -I ../hypre/include -I /usr/tcetmp/packages/spectrum_mpi/spectrum_mpi-10.1-xl-gcc-4.9.3/mpi/include/ -DUSE_NVTX -c -DHYPRE_USE_GPU -DHYPRE_USE_MANAGED -I${CUDA_HOME}/include"
-   		NVCCLIBS="-L /usr/local/cuda/lib64 -lcusparse -lcudart -lcublas -lnvToolsExt"
+   		NVCCLIBS="-L /usr/local/cuda/lib64 -lcusparse -lcudart -lcublas -lnvToolsExt -L /usr/lib64/nvidia -lnvidia-ml"
    		HYPRE_NVCC_MAKEFILE="Makefile.nvcc"
    	fi
 	hypre_user_chose_cuda=no
@@ -1692,7 +1692,7 @@ then
    	CXXFLAGS+=" -DUSE_NVTX -DHYPRE_USE_GPU -DHYPRE_MEMORY_GPU"
 	AC_DEFINE(HYPRE_USING_NVCC, 1, [Using nvcc compiler])
 	NVCCFLAGS="-O3 -arch=sm_60  -ccbin=xlc  -I ../hypre/include -I /usr/tcetmp/packages/spectrum_mpi/spectrum_mpi-10.1-xl-gcc-4.9.3/mpi/include/ -DUSE_NVTX -c -DHYPRE_USE_GPU -DHYPRE_USE_MANAGED -DHYPRE_MEMORY_GPU -I${CUDA_HOME}/include"
-   NVCCLIBS="-L${CUDA_HOME}/lib64 -lcusparse -lcudart -lcublas -lnvToolsExt"
+   NVCCLIBS="-L${CUDA_HOME}/lib64 -lcusparse -lcudart -lcublas -lnvToolsExt  -L /usr/lib64/nvidia -lnvidia-ml"
    HYPRE_NVCC_MAKEFILE="Makefile.nvcc"
    fi
 fi
@@ -1718,7 +1718,7 @@ if test "$hypre_using_device_openmp" = "yes"
 then
    CFLAGS+=" -DHYPRE_USE_OMP45 -DHYPRE_USE_OMP45_TARGET_ALLOC -DHYPRE_USING_CUSPARSE -DUSE_NVTX -DHYPRE_USING_OPENMP_OFFLOAD -DHYPRE_USE_MANAGED -I${CUDA_HOME}/include $NEWCFLAGS"
    CXXFLAGS+=" -DHYPRE_USE_OMP45 -DHYPRE_USE_OMP45_TARGET_ALLOC -DHYPRE_USING_CUSPARSE -DUSE_NVTX -DHYPRE_USING_OPENMP_OFFLOAD -DHYPRE_USE_MANAGED -I${CUDA_HOME}/include $NEWCFLAGS"
-   LIBS+=" -L${CUDA_HOME}/lib64 -lcusparse -lcudart -lcublas -lnvToolsExt"
+   LIBS+=" -L${CUDA_HOME}/lib64 -lcusparse -lcudart -lcublas -lnvToolsExt -L /usr/lib64/nvidia -lnvidia-ml"
    if [test "$CC" = "clang-gpu" || test "$CC" = "mpiclang-gpu"]
    then
      CFLAGS+=" -fopenmp-nonaliased-maps"
