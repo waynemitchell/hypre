@@ -362,6 +362,7 @@ hypre_BoomerAMGCreate()
    hypre_ParAMGDataAMGDDAgglomerationPartitionSize(amg_data) = 2;
    hypre_ParAMGDataCompGrid(amg_data) = NULL;
    hypre_ParAMGDataCompGridCommPkg(amg_data) = NULL;
+   hypre_ParAMGDataUseZFPCompression(amg_data) = 0;
 
 #ifdef CUMNUMIT
    hypre_ParAMGDataCumNumIterations(amg_data) = cum_num_iterations;

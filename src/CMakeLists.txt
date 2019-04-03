@@ -764,6 +764,8 @@ include_directories(../../parmetis-4.0.3/include/)
 include_directories(../../parmetis-4.0.3/metis/include)
 
 
+# !!! Include ZFP: again, what is the proper way to do this? And need to make changes to regular makefiles.
+include_directories(../../zfp/include)
 
 
 include_directories(blas)

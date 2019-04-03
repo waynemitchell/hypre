@@ -15,7 +15,8 @@
 
 #include "_hypre_parcsr_ls.h"
 #include "par_amg.h"
-#include "par_csr_block_matrix.h"	
+#include "par_csr_block_matrix.h"   
+#include "zfp.h"
 
 HYPRE_Int
 AddSolution( void *amg_vdata );
@@ -37,6 +38,9 @@ TestResComm(hypre_ParAMGData *amg_data);
 
 HYPRE_Int
 AgglomeratedProcessorsLocalResidualAllgather(hypre_ParAMGData *amg_data);
+
+HYPRE_Int
+MyZFPCompress(HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int decompress);
 
 HYPRE_Int 
 hypre_BoomerAMGDDSolve( void *amg_vdata,
@@ -142,14 +146,14 @@ hypre_BoomerAMGDDSolve( void *amg_vdata,
 HYPRE_Int
 hypre_BoomerAMGDD_Cycle( void *amg_vdata )
 {
-	HYPRE_Int   myid;
-	hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
+   HYPRE_Int   myid;
+   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
 
-	HYPRE_Int i,j,k,level;
+   HYPRE_Int i,j,k,level;
    HYPRE_Int cycle_count = 0;
-	hypre_ParAMGData	*amg_data = amg_vdata;
-	hypre_ParCompGrid 	**compGrid = hypre_ParAMGDataCompGrid(amg_data);
-  	HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
+   hypre_ParAMGData  *amg_data = amg_vdata;
+   hypre_ParCompGrid    **compGrid = hypre_ParAMGDataCompGrid(amg_data);
+   HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
    HYPRE_Int min_fac_iter = hypre_ParAMGDataMinFACIter(amg_data);
    HYPRE_Int max_fac_iter = hypre_ParAMGDataMaxFACIter(amg_data);
    HYPRE_Real fac_tol = hypre_ParAMGDataFACTol(amg_data);
@@ -160,12 +164,12 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata )
    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
    #endif
 
-	// Form residual and do residual communication
+   // Form residual and do residual communication
    HYPRE_Int test_failed = 0;
-	test_failed = hypre_BoomerAMGDDResidualCommunication( amg_vdata );
+   test_failed = hypre_BoomerAMGDDResidualCommunication( amg_vdata );
 
-	// Set zero initial guess for all comp grids on all levels
-	ZeroInitialGuess( amg_vdata );
+   // Set zero initial guess for all comp grids on all levels
+   ZeroInitialGuess( amg_vdata );
 
    // Setup convergence tolerance info
    HYPRE_Real resid_nrm = 1.;
@@ -194,7 +198,7 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata )
       else for (i = 0; i < hypre_ParCompGridNumNodes(hypre_ParAMGDataCompGrid(amg_data)[level]); i++) hypre_ParCompGridS( hypre_ParAMGDataCompGrid(amg_data)[level] )[i] = 0.0;
    }
 
-	// Do the cycles
+   // Do the cycles
    HYPRE_Int first_iteration = 1;
    if (fac_tol == 0.0)
    {
@@ -213,7 +217,7 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata )
       while ( (relative_resid >= fac_tol || cycle_count < min_fac_iter) && cycle_count < max_fac_iter )
       {
          // Do FAC cycle
-   		hypre_BoomerAMGDD_FAC_Cycle( amg_vdata, first_iteration );
+         hypre_BoomerAMGDD_FAC_Cycle( amg_vdata, first_iteration );
          first_iteration = 0;
 
          // Check convergence and up the cycle count
@@ -222,7 +226,7 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata )
 
          ++cycle_count;
          hypre_ParAMGDataNumFACIterations(amg_data) = cycle_count;
-   	}
+      }
    }
    else if (fac_tol < 0)
    {
@@ -244,7 +248,7 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata )
    
 
 
-	// Update fine grid solution
+   // Update fine grid solution
    AddSolution( amg_vdata );
 
    #if DEBUGGING_MESSAGES
@@ -253,22 +257,22 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata )
    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
    #endif
 
-	return test_failed;
+   return test_failed;
 }
 
 HYPRE_Int
 AddSolution( void *amg_vdata )
 {
-	hypre_ParAMGData	*amg_data = amg_vdata;
-	HYPRE_Complex 		*u = hypre_VectorData( hypre_ParVectorLocalVector( hypre_ParAMGDataUArray(amg_data)[0] ) );
-	hypre_ParCompGrid 	**compGrid = hypre_ParAMGDataCompGrid(amg_data);
-	HYPRE_Complex 		*u_comp = hypre_ParCompGridU(compGrid[0]);
-	HYPRE_Int 			num_owned_nodes = hypre_ParCompGridOwnedBlockStarts(compGrid[0])[hypre_ParCompGridNumOwnedBlocks(compGrid[0])];
-	HYPRE_Int 			i;
+   hypre_ParAMGData  *amg_data = amg_vdata;
+   HYPRE_Complex     *u = hypre_VectorData( hypre_ParVectorLocalVector( hypre_ParAMGDataUArray(amg_data)[0] ) );
+   hypre_ParCompGrid    **compGrid = hypre_ParAMGDataCompGrid(amg_data);
+   HYPRE_Complex     *u_comp = hypre_ParCompGridU(compGrid[0]);
+   HYPRE_Int         num_owned_nodes = hypre_ParCompGridOwnedBlockStarts(compGrid[0])[hypre_ParCompGridNumOwnedBlocks(compGrid[0])];
+   HYPRE_Int         i;
 
-	for (i = 0; i < num_owned_nodes; i++) u[i] += u_comp[i];
+   for (i = 0; i < num_owned_nodes; i++) u[i] += u_comp[i];
 
-	return 0;
+   return 0;
 }
 
 HYPRE_Real
@@ -295,10 +299,10 @@ GetCompositeResidual(hypre_ParCompGrid *compGrid)
 HYPRE_Int
 ZeroInitialGuess( void *amg_vdata )
 {
-	HYPRE_Int   myid;
-	hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
+   HYPRE_Int   myid;
+   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
 
-	hypre_ParAMGData	*amg_data = amg_vdata;
+   hypre_ParAMGData  *amg_data = amg_vdata;
    HYPRE_Int i;
 
    HYPRE_Int level;
@@ -307,8 +311,8 @@ ZeroInitialGuess( void *amg_vdata )
       hypre_ParCompGrid    *compGrid = hypre_ParAMGDataCompGrid(amg_data)[level];
       for (i = 0; i < hypre_ParCompGridNumNodes(compGrid); i++) hypre_ParCompGridU(compGrid)[i] = 0.0;
    }
-	
-	return 0;
+   
+   return 0;
 }
 
 HYPRE_Int 
@@ -343,6 +347,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
    HYPRE_Int                  *proc_first_index, *proc_last_index;
    HYPRE_Int                  *global_nodes;
    hypre_ParCompGrid          **compGrid;
+   HYPRE_Int                  compress;
 
    // info from comp grid comm pkg
    hypre_ParCompGridCommPkg   *compGridCommPkg;
@@ -378,6 +383,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
    num_levels = hypre_ParAMGDataNumLevels(amg_data);
    compGrid = hypre_ParAMGDataCompGrid(amg_data);
    compGridCommPkg = hypre_ParAMGDataCompGridCommPkg(amg_data);
+   compress = hypre_ParAMGDataUseZFPCompression(amg_data);
 
    // get info from comp grid comm pkg
    HYPRE_Int transition_level = hypre_ParCompGridCommPkgTransitionLevel(compGridCommPkg);
@@ -489,13 +495,32 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
          status = hypre_CTAlloc(hypre_MPI_Status, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST );
          send_buffer = hypre_CTAlloc(HYPRE_Complex*, num_partitions, HYPRE_MEMORY_HOST);
 
+         // Setup arrays to hold compressed buffers if using compression
+         void **compressed_send_buffer;
+         void **compressed_recv_buffer;
+         if (compress)
+         {
+            compressed_send_buffer = hypre_CTAlloc(void*, num_partitions, HYPRE_MEMORY_HOST);
+            compressed_recv_buffer = hypre_CTAlloc(void*, num_recv_procs, HYPRE_MEMORY_HOST);
+         }
+
          // allocate space for the receive buffers and post the receives
          for (i = 0; i < num_recv_procs; i++)
          {
             if (recv_buffer_size[level][i])
             {
                recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, recv_buffer_size[level][i], HYPRE_MEMORY_HOST );
-               hypre_MPI_Irecv( recv_buffer[i], recv_buffer_size[level][i], HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+               if (compress)
+               {
+                  // Decompress the recv buffer
+                  HYPRE_Int compressed_buffer_size = recv_buffer_size[level][i]; // !!! Debug: For now, just sending data of old size. Can I determine the actual compressed size a priori?
+                  MyZFPCompress(recv_buffer[i], recv_buffer_size[level][i], &(compressed_recv_buffer[i]), 1);
+                  hypre_MPI_Irecv( compressed_recv_buffer[i], compressed_buffer_size, HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+               }
+               else 
+               {
+                  hypre_MPI_Irecv( recv_buffer[i], recv_buffer_size[level][i], HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+               }
             }
          }
 
@@ -508,12 +533,19 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
                PackResidualBuffer(send_buffer[i], send_flag[level][i], num_send_nodes[level][i], compGrid, level, num_levels);
             }
          }
+
          for (i = 0; i < num_send_procs; i++)
          {
             HYPRE_Int buffer_index = hypre_ParCompGridCommPkgSendProcPartitions(compGridCommPkg)[level][i];
             if (send_buffer_size[level][buffer_index])
             {
-               hypre_MPI_Isend(send_buffer[buffer_index], send_buffer_size[level][buffer_index], HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
+               if (compress)
+               {
+                  // Compress the send buffer
+                  HYPRE_Int compressed_buffer_size = MyZFPCompress(send_buffer[buffer_index], send_buffer_size[level][buffer_index], &(compressed_send_buffer[buffer_index]), 0);
+                  hypre_MPI_Isend(compressed_send_buffer[buffer_index], compressed_buffer_size, HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
+               }
+               else hypre_MPI_Isend(send_buffer[buffer_index], send_buffer_size[level][buffer_index], HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
             }
          }
 
@@ -527,7 +559,15 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
             hypre_TFree(send_buffer[i], HYPRE_MEMORY_HOST);
          }
          hypre_TFree(send_buffer, HYPRE_MEMORY_HOST);
-         
+         if (compress)
+         {
+            for (i = 0; i < num_partitions; i++)
+            {
+               hypre_TFree(compressed_send_buffer[i], HYPRE_MEMORY_HOST);
+            }
+            hypre_TFree(compressed_send_buffer, HYPRE_MEMORY_HOST);
+         }
+
          // loop over received buffers
          for (i = 0; i < num_recv_procs; i++)
          {
@@ -541,6 +581,14 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
             hypre_TFree(recv_buffer[i], HYPRE_MEMORY_HOST);
          }
          hypre_TFree(recv_buffer, HYPRE_MEMORY_HOST);
+         if (compress)
+         {
+            for (i = 0; i < num_recv_procs; i++)
+            {
+               hypre_TFree(compressed_recv_buffer[i], HYPRE_MEMORY_HOST);
+            }
+            hypre_TFree(compressed_recv_buffer, HYPRE_MEMORY_HOST);
+         }
       }
 
       #if DEBUGGING_MESSAGES
@@ -791,4 +839,68 @@ AgglomeratedProcessorsLocalResidualAllgather(hypre_ParAMGData *amg_data)
    }
 
    return 0;
+}
+
+
+HYPRE_Int
+MyZFPCompress(HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int decompress)
+{
+
+   // ZFP stuff;
+   // zfp_field - attaches to the uncompressed array stored in memory
+   // bitstream - attaches to an allocated memory space for the compressed buffer
+   // zfp_stream - attaches to the bitstream above (is this really necessary? can I just attach the zfp stream directly to the allocated memory space for the compressed buffer?)
+
+   // Declare zfp stuff
+   zfp_field *field;
+   zfp_stream *zfp;
+   bitstream *stream;
+
+   // Associate a zfp_field with the uncompressed send buffer
+   field = zfp_field_1d(uncompressed_buffer, zfp_type_double, uncompressed_buffer_size); // !!! Question: Is zfp_type_double the correct thing to use here? The buffer has type HYPRE_Complex...
+
+   // Setup ZFP stream parameters and mode
+   zfp = zfp_stream_open(NULL);
+   double rate = 12 / 4; // this is maxbits / 4^d, and maxbits must be at least 12 for double precision
+   zfp_stream_set_rate(zfp, rate, zfp_type_double, 1, 0); // !!! Question: same thing about zfp_type_double
+   // double precision = ;
+   // zfp_stream_set_precision(zfp, precision);
+   // double accuracy = 0.0001;
+   // zfp_stream_set_accuracy(zfp, accuracy);
+
+   // Get size of compressed buffer, allocate, and attach bistream to compressed buffer, and attach zfp stream to bitstream
+   size_t compressed_buffer_size = zfp_stream_maximum_size(zfp, field);
+
+
+   // !!! Debug: allocate compressed_buffer_size to uncompressed_buffer_size for now. That is, don't worry about actually sending less data yet, just see whether compress/decompress works
+   compressed_buffer_size = uncompressed_buffer_size;
+
+   (*compressed_buffer) = malloc(compressed_buffer_size);
+   stream = stream_open((*compressed_buffer), compressed_buffer_size);
+   zfp_stream_set_bit_stream(zfp, stream);
+   zfp_stream_rewind(zfp);
+
+   // Do the compression or decompression
+   size_t zfpsize;
+   if (!decompress)
+   {
+      zfpsize = zfp_compress(zfp, field);
+      if (!zfpsize) printf("Compression failed!\n");
+   }
+   else
+   {
+      if (!zfp_decompress(zfp, field)) printf("Decompression failed!\n");
+   }
+
+   // Close the field and streams
+   zfp_field_free(field);
+   zfp_stream_close(zfp);
+   stream_close(stream);
+
+
+
+   // !!! Debug: for now, return the uncompressed_buffer_size. See above note.
+   return uncompressed_buffer_size;
+
+   // return (HYPRE_Int) zfpsize; // !!! Question: should I return zfpsize or compressed_buffer_size? Are these the same for fixed rate?
 }
