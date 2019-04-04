@@ -40,7 +40,7 @@ HYPRE_Int
 AgglomeratedProcessorsLocalResidualAllgather(hypre_ParAMGData *amg_data);
 
 HYPRE_Int
-MyZFPCompress(HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int decompress);
+MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int compressed_buffer_size, HYPRE_Int decompress);
 
 HYPRE_Int 
 hypre_BoomerAMGDDSolve( void *amg_vdata,
@@ -489,19 +489,76 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
       {
          // allocate space for the buffers, buffer sizes, requests and status, psiComposite_send, psiComposite_recv, send and recv maps
          recv_buffer = hypre_CTAlloc(HYPRE_Complex*, num_recv_procs, HYPRE_MEMORY_HOST);
-
-         request_counter = 0;
          requests = hypre_CTAlloc(hypre_MPI_Request, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST );
          status = hypre_CTAlloc(hypre_MPI_Status, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST );
          send_buffer = hypre_CTAlloc(HYPRE_Complex*, num_partitions, HYPRE_MEMORY_HOST);
+         request_counter = 0;
 
-         // Setup arrays to hold compressed buffers if using compression
+         // Setup extra arrays to hold compressed buffers, sizes, and MPI requests/statuses if using compression
          void **compressed_send_buffer;
          void **compressed_recv_buffer;
+         HYPRE_Int *compressed_send_buffer_size;
+         HYPRE_Int *compressed_recv_buffer_size;
+         hypre_MPI_Request *size_requests;
+         hypre_MPI_Status *size_status;
+         HYPRE_Int size_request_counter = 0;
          if (compress)
          {
             compressed_send_buffer = hypre_CTAlloc(void*, num_partitions, HYPRE_MEMORY_HOST);
             compressed_recv_buffer = hypre_CTAlloc(void*, num_recv_procs, HYPRE_MEMORY_HOST);
+            compressed_send_buffer_size = hypre_CTAlloc(HYPRE_Int, num_partitions, HYPRE_MEMORY_HOST);
+            compressed_recv_buffer_size = hypre_CTAlloc(HYPRE_Int, num_recv_procs, HYPRE_MEMORY_HOST);
+            size_requests = hypre_CTAlloc(hypre_MPI_Request, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST );
+            size_status = hypre_CTAlloc(hypre_MPI_Status, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST );
+         }
+
+         // pack the send buffers
+         for (i = 0; i < num_partitions; i++)
+         {
+            if (send_buffer_size[level][i])
+            {
+               send_buffer[i] = hypre_CTAlloc(HYPRE_Complex, send_buffer_size[level][i], HYPRE_MEMORY_HOST);
+               PackResidualBuffer(send_buffer[i], send_flag[level][i], num_send_nodes[level][i], compGrid, level, num_levels);
+               if (compress)
+               {
+                  // Compress the send buffer and get the compressed size
+                  compressed_send_buffer_size[i] = MyZFPCompress(amg_data, send_buffer[i], send_buffer_size[level][i], &(compressed_send_buffer[i]), 0, 0);
+               }
+            }
+         }
+
+         // if using fixed rate compression, get the compressed sizes
+         if (compress == 1)
+         {
+            for (i = 0; i < num_recv_procs; i++)
+               compressed_recv_buffer_size[i] = GetZFPFixedRateCompressedSizes(hypre_ParAMGDataZFPRate(amg_data), recv_buffer[i], recv_buffer_size[level][i]);
+         }
+         // otherwise when using compression, need to communicate the compressed sizes
+         else if (compress > 1)
+         {
+            // post the sends for the sizes
+            for (i = 0; i < num_send_procs; i++)
+            {
+               HYPRE_Int buffer_index = hypre_ParCompGridCommPkgSendProcPartitions(compGridCommPkg)[level][i];
+               if (send_buffer_size[level][buffer_index])
+               {
+                  hypre_MPI_Isend(&(compressed_send_buffer_size[buffer_index]), 1, HYPRE_MPI_INT, send_procs[level][i], 4, comm, &size_requests[size_request_counter++]);
+               }
+            }
+
+            // post the recvs for the sizes
+            for (i = 0; i < num_recv_procs; i++)
+            {
+               if (recv_buffer_size[level][i])
+               {
+                  hypre_MPI_Irecv( &(compressed_recv_buffer_size[i]), 1, HYPRE_MPI_INT, recv_procs[level][i], 4, comm, &size_requests[size_request_counter++]);
+               }
+            }
+
+            // wait on the sizes to be received
+            hypre_MPI_Waitall( size_request_counter, size_requests, size_status );
+            hypre_TFree(size_requests, HYPRE_MEMORY_HOST);
+            hypre_TFree(size_status, HYPRE_MEMORY_HOST);
          }
 
          // allocate space for the receive buffers and post the receives
@@ -512,39 +569,20 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
                recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, recv_buffer_size[level][i], HYPRE_MEMORY_HOST );
                if (compress)
                {
-                  // Decompress the recv buffer
-                  HYPRE_Int compressed_buffer_size = recv_buffer_size[level][i]; // !!! Debug: For now, just sending data of old size. Can I determine the actual compressed size a priori?
-                  MyZFPCompress(recv_buffer[i], recv_buffer_size[level][i], &(compressed_recv_buffer[i]), 1);
-                  hypre_MPI_Irecv( compressed_recv_buffer[i], compressed_buffer_size, HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+                  compressed_recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, compressed_recv_buffer_size[i], HYPRE_MEMORY_HOST);
+                  hypre_MPI_Irecv( compressed_recv_buffer[i], compressed_recv_buffer_size[i], MPI_BYTE, recv_procs[level][i], 3, comm, &requests[request_counter++]); // !!! Question: what's the proper MPI data type to use? Same applies to the send call below.
                }
-               else 
-               {
-                  hypre_MPI_Irecv( recv_buffer[i], recv_buffer_size[level][i], HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
-               }
+               else hypre_MPI_Irecv( recv_buffer[i], recv_buffer_size[level][i], HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
             }
          }
 
-         // pack and send the buffers
-         for (i = 0; i < num_partitions; i++)
-         {
-            if (send_buffer_size[level][i])
-            {
-               send_buffer[i] = hypre_CTAlloc(HYPRE_Complex, send_buffer_size[level][i], HYPRE_MEMORY_HOST);
-               PackResidualBuffer(send_buffer[i], send_flag[level][i], num_send_nodes[level][i], compGrid, level, num_levels);
-            }
-         }
-
+         // post the sends
          for (i = 0; i < num_send_procs; i++)
          {
             HYPRE_Int buffer_index = hypre_ParCompGridCommPkgSendProcPartitions(compGridCommPkg)[level][i];
             if (send_buffer_size[level][buffer_index])
             {
-               if (compress)
-               {
-                  // Compress the send buffer
-                  HYPRE_Int compressed_buffer_size = MyZFPCompress(send_buffer[buffer_index], send_buffer_size[level][buffer_index], &(compressed_send_buffer[buffer_index]), 0);
-                  hypre_MPI_Isend(compressed_send_buffer[buffer_index], compressed_buffer_size, HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
-               }
+               if (compress) hypre_MPI_Isend(compressed_send_buffer[buffer_index], compressed_send_buffer_size[buffer_index], MPI_BYTE, send_procs[level][i], 3, comm, &requests[request_counter++]);
                else hypre_MPI_Isend(send_buffer[buffer_index], send_buffer_size[level][buffer_index], HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
             }
          }
@@ -566,13 +604,22 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
                hypre_TFree(compressed_send_buffer[i], HYPRE_MEMORY_HOST);
             }
             hypre_TFree(compressed_send_buffer, HYPRE_MEMORY_HOST);
+            hypre_TFree(compressed_send_buffer_size, HYPRE_MEMORY_HOST);
          }
 
          // loop over received buffers
          for (i = 0; i < num_recv_procs; i++)
          {
-            // unpack the buffers
-            UnpackResidualBuffer(recv_buffer[i], recv_map[level][i], num_recv_nodes[level][i], compGrid, level, num_levels);
+            if (recv_buffer_size[level][i])
+            {
+               // if necessary, decompress the recv buffer
+               if (compress)
+               {
+                  MyZFPCompress(amg_data, recv_buffer[i], recv_buffer_size[level][i], &(compressed_recv_buffer[i]), compressed_recv_buffer_size[i], 1);
+               }
+               // unpack the buffers
+               UnpackResidualBuffer(recv_buffer[i], recv_map[level][i], num_recv_nodes[level][i], compGrid, level, num_levels);
+            }
          }
 
          // clean up memory for this level
@@ -588,6 +635,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
                hypre_TFree(compressed_recv_buffer[i], HYPRE_MEMORY_HOST);
             }
             hypre_TFree(compressed_recv_buffer, HYPRE_MEMORY_HOST);
+            hypre_TFree(compressed_recv_buffer_size, HYPRE_MEMORY_HOST);
          }
       }
 
@@ -596,7 +644,6 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
       if (myid == 0) hypre_printf("   Finished residual communication on level %d on all ranks\n", level);
       hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
       #endif
-
    }
 
    #if DEBUGGING_MESSAGES
@@ -843,49 +890,46 @@ AgglomeratedProcessorsLocalResidualAllgather(hypre_ParAMGData *amg_data)
 
 
 HYPRE_Int
-MyZFPCompress(HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int decompress)
+MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int compressed_buffer_size, HYPRE_Int decompress)
 {
+   // Get zfp parameters
+   HYPRE_Int zfp_mode = hypre_ParAMGDataUseZFPCompression(amg_data);
+   double rate = hypre_ParAMGDataZFPRate(amg_data);
+   double precision = hypre_ParAMGDataZFPPrecision(amg_data);
+   double accuracy = hypre_ParAMGDataZFPAccuracy(amg_data);
 
-   // ZFP stuff;
-   // zfp_field - attaches to the uncompressed array stored in memory
-   // bitstream - attaches to an allocated memory space for the compressed buffer
-   // zfp_stream - attaches to the bitstream above (is this really necessary? can I just attach the zfp stream directly to the allocated memory space for the compressed buffer?)
-
-   // Declare zfp stuff
+   // Declare zfp structs
    zfp_field *field;
    zfp_stream *zfp;
    bitstream *stream;
 
    // Associate a zfp_field with the uncompressed send buffer
-   field = zfp_field_1d(uncompressed_buffer, zfp_type_double, uncompressed_buffer_size); // !!! Question: Is zfp_type_double the correct thing to use here? The buffer has type HYPRE_Complex...
-
+   field = zfp_field_1d(uncompressed_buffer, zfp_type_double, uncompressed_buffer_size); 
+   // !!! Question: Is zfp_type_double the correct thing to use here? The buffer has type HYPRE_Complex... should be fine unless hypre is configured to use complex numbers. What then???
+   
    // Setup ZFP stream parameters and mode
    zfp = zfp_stream_open(NULL);
-   double rate = 12 / 4; // this is maxbits / 4^d, and maxbits must be at least 12 for double precision
-   zfp_stream_set_rate(zfp, rate, zfp_type_double, 1, 0); // !!! Question: same thing about zfp_type_double
-   // double precision = ;
-   // zfp_stream_set_precision(zfp, precision);
-   // double accuracy = 0.0001;
-   // zfp_stream_set_accuracy(zfp, accuracy);
+   if (zfp_mode == 1) zfp_stream_set_rate(zfp, rate, zfp_type_double, 1, 0); // !!! Question: same thing about zfp_type_double, !!! Question: do I need to set the last parameter to 1 (this guarantees random access to the compressed array)
+   if (zfp_mode == 2) zfp_stream_set_precision(zfp, precision);
+   if (zfp_mode == 3) zfp_stream_set_accuracy(zfp, accuracy);
 
    // Get size of compressed buffer, allocate, and attach bistream to compressed buffer, and attach zfp stream to bitstream
-   size_t compressed_buffer_size = zfp_stream_maximum_size(zfp, field);
-
-
-   // !!! Debug: allocate compressed_buffer_size to uncompressed_buffer_size for now. That is, don't worry about actually sending less data yet, just see whether compress/decompress works
-   compressed_buffer_size = uncompressed_buffer_size;
-
-   (*compressed_buffer) = malloc(compressed_buffer_size);
+   if (!decompress)
+   {
+      compressed_buffer_size = zfp_stream_maximum_size(zfp, field);
+      (*compressed_buffer) = malloc(compressed_buffer_size);
+   }
    stream = stream_open((*compressed_buffer), compressed_buffer_size);
    zfp_stream_set_bit_stream(zfp, stream);
    zfp_stream_rewind(zfp);
 
    // Do the compression or decompression
-   size_t zfpsize;
+   size_t zfpsize = 0;
    if (!decompress)
    {
       zfpsize = zfp_compress(zfp, field);
       if (!zfpsize) printf("Compression failed!\n");
+      // printf("uncompressed_buffer_size = %d, compressed_buffer_size = %d, zfpsize = %d\n", uncompressed_buffer_size*8, compressed_buffer_size, zfpsize);
    }
    else
    {
@@ -897,10 +941,33 @@ MyZFPCompress(HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_
    zfp_stream_close(zfp);
    stream_close(stream);
 
+   return (HYPRE_Int) zfpsize;
+}
 
+HYPRE_Int
+GetZFPFixedRateCompressedSizes(double rate, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size)
+{
+   // Declare zfp structs
+   zfp_field *field;
+   zfp_stream *zfp;
 
-   // !!! Debug: for now, return the uncompressed_buffer_size. See above note.
-   return uncompressed_buffer_size;
+   // Associate a zfp_field with the uncompressed send buffer
+   field = zfp_field_1d(uncompressed_buffer, zfp_type_double, uncompressed_buffer_size); 
+   // !!! Question: Is zfp_type_double the correct thing to use here? The buffer has type HYPRE_Complex... should be fine unless hypre is configured to use complex numbers. What then???
+   
+   // Setup ZFP stream parameters and mode
+   zfp = zfp_stream_open(NULL);
+   zfp_stream_set_rate(zfp, rate, zfp_type_double, 1, 0);
 
-   // return (HYPRE_Int) zfpsize; // !!! Question: should I return zfpsize or compressed_buffer_size? Are these the same for fixed rate?
+   // Get size of compressed buffer
+   HYPRE_Int compressed_buffer_size = zfp_stream_maximum_size(zfp, field);
+
+   // For fixed rate, zfpsize (i.e. the actual desired size) is compressed_buffer_size - 24
+   compressed_buffer_size = compressed_buffer_size - 24;
+
+   // Close the field and stream
+   zfp_field_free(field);
+   zfp_stream_close(zfp);
+
+   return compressed_buffer_size;
 }

@@ -120,6 +120,9 @@ typedef struct
    hypre_ParCompGrid       **compGrid;
    hypre_ParCompGridCommPkg *compGridCommPkg;
    HYPRE_Int                 use_zfp_compression;
+   double                    zfp_rate;
+   double                    zfp_precision;
+   double                    zfp_accuracy;
 
    /* Block data */
    hypre_ParCSRBlockMatrix **A_block_array;
@@ -392,6 +395,9 @@ typedef struct
 #define hypre_ParAMGDataCompGrid(amg_data) ((amg_data)->compGrid)
 #define hypre_ParAMGDataCompGridCommPkg(amg_data) ((amg_data)->compGridCommPkg)
 #define hypre_ParAMGDataUseZFPCompression(amg_data) ((amg_data)->use_zfp_compression)
+#define hypre_ParAMGDataZFPRate(amg_data) ((amg_data)->zfp_rate)
+#define hypre_ParAMGDataZFPPrecision(amg_data) ((amg_data)->zfp_precision)
+#define hypre_ParAMGDataZFPAccuracy(amg_data) ((amg_data)->zfp_accuracy)
 
 /* block */
 #define hypre_ParAMGDataABlockArray(amg_data) ((amg_data)->A_block_array)
