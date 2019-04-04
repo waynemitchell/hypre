@@ -42,11 +42,15 @@ AgglomeratedProcessorsLocalResidualAllgather(hypre_ParAMGData *amg_data);
 HYPRE_Int
 MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int compressed_buffer_size, HYPRE_Int decompress);
 
+HYPRE_Int
+GetZFPFixedRateCompressedSizes(double rate, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size);
+
 HYPRE_Int 
 hypre_BoomerAMGDDSolve( void *amg_vdata,
                                  hypre_ParCSRMatrix *A,
                                  hypre_ParVector *f,
-                                 hypre_ParVector *u )
+                                 hypre_ParVector *u,
+                                 HYPRE_Int *communication_cost )
 {
 
    HYPRE_Int test_failed = 0;
@@ -105,7 +109,7 @@ hypre_BoomerAMGDDSolve( void *amg_vdata,
    while ( (relative_resid >= tol || cycle_count < min_iter) && cycle_count < max_iter )
    {
       // Do the AMGDD cycle
-      error_code = hypre_BoomerAMGDD_Cycle(amg_vdata);
+      error_code = hypre_BoomerAMGDD_Cycle(amg_vdata, communication_cost);
       if (error_code) test_failed = 1;
 
       // Calculate a new resiudal
@@ -144,7 +148,7 @@ hypre_BoomerAMGDDSolve( void *amg_vdata,
 }
 
 HYPRE_Int
-hypre_BoomerAMGDD_Cycle( void *amg_vdata )
+hypre_BoomerAMGDD_Cycle( void *amg_vdata, HYPRE_Int *communication_cost )
 {
    HYPRE_Int   myid;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -166,7 +170,7 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata )
 
    // Form residual and do residual communication
    HYPRE_Int test_failed = 0;
-   test_failed = hypre_BoomerAMGDDResidualCommunication( amg_vdata );
+   test_failed = hypre_BoomerAMGDDResidualCommunication( amg_vdata, communication_cost );
 
    // Set zero initial guess for all comp grids on all levels
    ZeroInitialGuess( amg_vdata );
@@ -316,7 +320,7 @@ ZeroInitialGuess( void *amg_vdata )
 }
 
 HYPRE_Int 
-hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
+hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communication_cost )
 {
    HYPRE_Int   myid, num_procs;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -543,6 +547,11 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
                if (send_buffer_size[level][buffer_index])
                {
                   hypre_MPI_Isend(&(compressed_send_buffer_size[buffer_index]), 1, HYPRE_MPI_INT, send_procs[level][i], 4, comm, &size_requests[size_request_counter++]);
+                  if (communication_cost)
+                  {
+                     communication_cost[level*7 + 4]++;
+                     communication_cost[level*7 + 5] += sizeof(HYPRE_Int);
+                  }
                }
             }
 
@@ -582,7 +591,11 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata )
             HYPRE_Int buffer_index = hypre_ParCompGridCommPkgSendProcPartitions(compGridCommPkg)[level][i];
             if (send_buffer_size[level][buffer_index])
             {
-               if (compress) hypre_MPI_Isend(compressed_send_buffer[buffer_index], compressed_send_buffer_size[buffer_index], MPI_BYTE, send_procs[level][i], 3, comm, &requests[request_counter++]);
+               if (compress)
+               {
+                  hypre_MPI_Isend(compressed_send_buffer[buffer_index], compressed_send_buffer_size[buffer_index], MPI_BYTE, send_procs[level][i], 3, comm, &requests[request_counter++]);
+                  if (communication_cost) communication_cost[level*7 + 5] += compressed_send_buffer_size[buffer_index];
+               }
                else hypre_MPI_Isend(send_buffer[buffer_index], send_buffer_size[level][buffer_index], HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
             }
          }
