@@ -188,8 +188,6 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata, HYPRE_Int *communication_cost )
    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
    #endif
 
-
-   // !!! New: initialize temp vectors to zero
    HYPRE_Int transition_level = hypre_ParCompGridCommPkgTransitionLevel(hypre_ParAMGDataCompGridCommPkg(amg_data));
    if (transition_level < 0) transition_level = num_levels;
    for (level = 0; level < transition_level; level++)
@@ -579,7 +577,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
                if (compress)
                {
                   compressed_recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, compressed_recv_buffer_size[i], HYPRE_MEMORY_HOST);
-                  hypre_MPI_Irecv( compressed_recv_buffer[i], compressed_recv_buffer_size[i], MPI_BYTE, recv_procs[level][i], 3, comm, &requests[request_counter++]); // !!! Question: what's the proper MPI data type to use? Same applies to the send call below.
+                  hypre_MPI_Irecv( compressed_recv_buffer[i], compressed_recv_buffer_size[i], MPI_BYTE, recv_procs[level][i], 3, comm, &requests[request_counter++]);
                }
                else hypre_MPI_Irecv( recv_buffer[i], recv_buffer_size[level][i], HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
             }
@@ -918,11 +916,10 @@ MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HY
 
    // Associate a zfp_field with the uncompressed send buffer
    field = zfp_field_1d(uncompressed_buffer, zfp_type_double, uncompressed_buffer_size); 
-   // !!! Question: Is zfp_type_double the correct thing to use here? The buffer has type HYPRE_Complex... should be fine unless hypre is configured to use complex numbers. What then???
    
    // Setup ZFP stream parameters and mode
    zfp = zfp_stream_open(NULL);
-   if (zfp_mode == 1) zfp_stream_set_rate(zfp, rate, zfp_type_double, 1, 0); // !!! Question: same thing about zfp_type_double, !!! Question: do I need to set the last parameter to 1 (this guarantees random access to the compressed array)
+   if (zfp_mode == 1) zfp_stream_set_rate(zfp, rate, zfp_type_double, 1, 0);
    if (zfp_mode == 2) zfp_stream_set_precision(zfp, precision);
    if (zfp_mode == 3) zfp_stream_set_accuracy(zfp, accuracy);
 
@@ -954,7 +951,8 @@ MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HY
    zfp_stream_close(zfp);
    stream_close(stream);
 
-   return (HYPRE_Int) zfpsize;
+   if (zfp_mode == 1) return compressed_buffer_size;
+   else return (HYPRE_Int) zfpsize;
 }
 
 HYPRE_Int
@@ -966,7 +964,6 @@ GetZFPFixedRateCompressedSizes(double rate, HYPRE_Complex *uncompressed_buffer, 
 
    // Associate a zfp_field with the uncompressed send buffer
    field = zfp_field_1d(uncompressed_buffer, zfp_type_double, uncompressed_buffer_size); 
-   // !!! Question: Is zfp_type_double the correct thing to use here? The buffer has type HYPRE_Complex... should be fine unless hypre is configured to use complex numbers. What then???
    
    // Setup ZFP stream parameters and mode
    zfp = zfp_stream_open(NULL);
@@ -974,9 +971,6 @@ GetZFPFixedRateCompressedSizes(double rate, HYPRE_Complex *uncompressed_buffer, 
 
    // Get size of compressed buffer
    HYPRE_Int compressed_buffer_size = zfp_stream_maximum_size(zfp, field);
-
-   // For fixed rate, zfpsize (i.e. the actual desired size) is compressed_buffer_size - 24
-   compressed_buffer_size = compressed_buffer_size - 24;
 
    // Close the field and stream
    zfp_field_free(field);
