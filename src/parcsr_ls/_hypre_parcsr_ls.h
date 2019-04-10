@@ -1962,9 +1962,9 @@ HYPRE_Int hypre_MGRGetNumIterations( void *mgr_vdata, HYPRE_Int *num_iterations 
 HYPRE_Int hypre_MGRGetFinalRelativeResidualNorm( void *mgr_vdata, HYPRE_Real *res_norm );
 
 /* par_amgdd_solve.c */
-HYPRE_Int hypre_BoomerAMGDDSolve( void *solver, hypre_ParCSRMatrix *A, hypre_ParVector *b,hypre_ParVector *x, HYPRE_Int *communication_cost );
-HYPRE_Int hypre_BoomerAMGDD_Cycle( void *amg_vdata, HYPRE_Int *communication_cost );
-HYPRE_Int hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communication_cost );
+HYPRE_Int hypre_BoomerAMGDDSolve( void *solver, hypre_ParCSRMatrix *A, hypre_ParVector *b,hypre_ParVector *x, HYPRE_Int *communication_cost, HYPRE_Real *zfp_errors );
+HYPRE_Int hypre_BoomerAMGDD_Cycle( void *amg_vdata, HYPRE_Int *communication_cost, HYPRE_Real *zfp_errors );
+HYPRE_Int hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communication_cost, HYPRE_Real *zfp_errors );
 
 /* par_amgdd_setup.c */
 HYPRE_Int hypre_BoomerAMGDDSetup(  void *amg_vdata, hypre_ParCSRMatrix *A, hypre_ParVector *b, hypre_ParVector *x, HYPRE_Int *timers, HYPRE_Int use_barriers, HYPRE_Int *communication_cost, HYPRE_Int verify_amgdd );

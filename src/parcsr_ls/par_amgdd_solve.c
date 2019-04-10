@@ -40,7 +40,7 @@ HYPRE_Int
 AgglomeratedProcessorsLocalResidualAllgather(hypre_ParAMGData *amg_data);
 
 HYPRE_Int
-MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int compressed_buffer_size, HYPRE_Int decompress);
+MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int compressed_buffer_size, HYPRE_Int decompress, HYPRE_Real *zfp_errors);
 
 HYPRE_Int
 GetZFPFixedRateCompressedSizes(double rate, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size);
@@ -50,7 +50,8 @@ hypre_BoomerAMGDDSolve( void *amg_vdata,
                                  hypre_ParCSRMatrix *A,
                                  hypre_ParVector *f,
                                  hypre_ParVector *u,
-                                 HYPRE_Int *communication_cost )
+                                 HYPRE_Int *communication_cost,
+                                 HYPRE_Real *zfp_errors )
 {
 
    HYPRE_Int test_failed = 0;
@@ -109,7 +110,7 @@ hypre_BoomerAMGDDSolve( void *amg_vdata,
    while ( (relative_resid >= tol || cycle_count < min_iter) && cycle_count < max_iter )
    {
       // Do the AMGDD cycle
-      error_code = hypre_BoomerAMGDD_Cycle(amg_vdata, communication_cost);
+      error_code = hypre_BoomerAMGDD_Cycle(amg_vdata, communication_cost, zfp_errors);
       if (error_code) test_failed = 1;
 
       // Calculate a new resiudal
@@ -148,7 +149,7 @@ hypre_BoomerAMGDDSolve( void *amg_vdata,
 }
 
 HYPRE_Int
-hypre_BoomerAMGDD_Cycle( void *amg_vdata, HYPRE_Int *communication_cost )
+hypre_BoomerAMGDD_Cycle( void *amg_vdata, HYPRE_Int *communication_cost, HYPRE_Real *zfp_errors )
 {
    HYPRE_Int   myid;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -170,7 +171,7 @@ hypre_BoomerAMGDD_Cycle( void *amg_vdata, HYPRE_Int *communication_cost )
 
    // Form residual and do residual communication
    HYPRE_Int test_failed = 0;
-   test_failed = hypre_BoomerAMGDDResidualCommunication( amg_vdata, communication_cost );
+   test_failed = hypre_BoomerAMGDDResidualCommunication( amg_vdata, communication_cost, zfp_errors );
 
    // Set zero initial guess for all comp grids on all levels
    ZeroInitialGuess( amg_vdata );
@@ -318,7 +319,7 @@ ZeroInitialGuess( void *amg_vdata )
 }
 
 HYPRE_Int 
-hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communication_cost )
+hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communication_cost, HYPRE_Real *zfp_errors )
 {
    HYPRE_Int   myid, num_procs;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -524,7 +525,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
                if (compress)
                {
                   // Compress the send buffer and get the compressed size
-                  compressed_send_buffer_size[i] = MyZFPCompress(amg_data, send_buffer[i], send_buffer_size[level][i], &(compressed_send_buffer[i]), 0, 0);
+                  compressed_send_buffer_size[i] = MyZFPCompress(amg_data, send_buffer[i], send_buffer_size[level][i], &(compressed_send_buffer[i]), 0, 0, zfp_errors);
                }
             }
          }
@@ -626,7 +627,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
                // if necessary, decompress the recv buffer
                if (compress)
                {
-                  MyZFPCompress(amg_data, recv_buffer[i], recv_buffer_size[level][i], &(compressed_recv_buffer[i]), compressed_recv_buffer_size[i], 1);
+                  MyZFPCompress(amg_data, recv_buffer[i], recv_buffer_size[level][i], &(compressed_recv_buffer[i]), compressed_recv_buffer_size[i], 1, NULL);
                }
                // unpack the buffers
                UnpackResidualBuffer(recv_buffer[i], recv_map[level][i], num_recv_nodes[level][i], compGrid, level, num_levels);
@@ -901,7 +902,7 @@ AgglomeratedProcessorsLocalResidualAllgather(hypre_ParAMGData *amg_data)
 
 
 HYPRE_Int
-MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int compressed_buffer_size, HYPRE_Int decompress)
+MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HYPRE_Int uncompressed_buffer_size, void **compressed_buffer, HYPRE_Int compressed_buffer_size, HYPRE_Int decompress, HYPRE_Real *zfp_errors)
 {
    // Get zfp parameters
    HYPRE_Int zfp_mode = hypre_ParAMGDataUseZFPCompression(amg_data);
@@ -946,10 +947,74 @@ MyZFPCompress(hypre_ParAMGData *amg_data, HYPRE_Complex *uncompressed_buffer, HY
       if (!zfp_decompress(zfp, field)) printf("Decompression failed!\n");
    }
 
-   // Close the field and streams
-   zfp_field_free(field);
-   zfp_stream_close(zfp);
-   stream_close(stream);
+   // Measure the component-wise and block relative errors
+   if (!decompress && zfp_errors)
+   {
+      // Close the field and streams
+      zfp_field_free(field);
+      zfp_stream_close(zfp);
+
+      // Reset field and streams and decompress buffer
+      HYPRE_Complex *decompressed_buffer = hypre_CTAlloc(HYPRE_Complex, uncompressed_buffer_size, HYPRE_MEMORY_HOST);
+      field = zfp_field_1d(decompressed_buffer, zfp_type_double, uncompressed_buffer_size);
+      zfp = zfp_stream_open(NULL);
+      if (zfp_mode == 1) zfp_stream_set_rate(zfp, rate, zfp_type_double, 1, 0);
+      if (zfp_mode == 2) zfp_stream_set_precision(zfp, precision);
+      if (zfp_mode == 3) zfp_stream_set_accuracy(zfp, accuracy);
+      zfp_stream_set_bit_stream(zfp, stream);
+      zfp_stream_rewind(zfp);
+      zfp_decompress(zfp, field);
+
+      // Compare uncompressed and decompressed buffers to get component-wise and block relative errors
+      HYPRE_Real component_wise_error = 0;
+      HYPRE_Real block_error = 0;
+      HYPRE_Real x_inf_norm = 0;
+      HYPRE_Int i;
+      for (i = 0; i < uncompressed_buffer_size; i++)
+      {
+         if (fabs(uncompressed_buffer[i]) > x_inf_norm) x_inf_norm = fabs(uncompressed_buffer[i]);
+         if (fabs(uncompressed_buffer[i] - decompressed_buffer[i]) > block_error) block_error = fabs(uncompressed_buffer[i] - decompressed_buffer[i]);
+         if (uncompressed_buffer[i] != 0.0) if (fabs((uncompressed_buffer[i] - decompressed_buffer[i]) / uncompressed_buffer[i]) > component_wise_error) component_wise_error = fabs((uncompressed_buffer[i] - decompressed_buffer[i]) / uncompressed_buffer[i]);
+      }
+      zfp_errors[0] = component_wise_error;
+      zfp_errors[1] = block_error / x_inf_norm;
+
+      // Close the field and streams
+      zfp_field_free(field);
+      zfp_stream_close(zfp);
+      stream_close(stream);
+
+      // Get the variation in the exponent for the uncompressed data
+      int e_min = 999, e_max = -999;
+      int e;
+      int i_min = 0, i_max = 0;
+      for (i = 1; i < uncompressed_buffer_size; i++)
+      {
+         if (uncompressed_buffer[i] != 0.0)
+         {
+            frexp(uncompressed_buffer[i], &e);
+            if (e < e_min)
+            {
+               i_min = i;
+               e_min = e;
+            }
+            if (e > e_max)
+            {
+               i_max = i;
+               e_max = e;
+            }
+         }
+      }
+      // printf("max = %e, e = %d, min = %e, e = %d\n", uncompressed_buffer[i_max], e_max, uncompressed_buffer[i_min], e_min);
+      zfp_errors[2] = e_max - e_min;
+   }
+   else
+   {
+      // Close the field and streams
+      zfp_field_free(field);
+      zfp_stream_close(zfp);
+      stream_close(stream);
+   }
 
    if (zfp_mode == 1) return compressed_buffer_size;
    else return (HYPRE_Int) zfpsize;
