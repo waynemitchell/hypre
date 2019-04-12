@@ -347,8 +347,6 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
    hypre_ParVector            **U_array;
    hypre_ParCSRMatrix         **P_array;
    hypre_ParVector            *Vtemp;
-   HYPRE_Int                  *proc_first_index, *proc_last_index;
-   HYPRE_Int                  *global_nodes;
    hypre_ParCompGrid          **compGrid;
    HYPRE_Int                  compress;
 
@@ -399,17 +397,6 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
    num_recv_nodes = hypre_ParCompGridCommPkgNumRecvNodes(compGridCommPkg);
    send_flag = hypre_ParCompGridCommPkgSendFlag(compGridCommPkg);
    recv_map = hypre_ParCompGridCommPkgRecvMap(compGridCommPkg);
-
-   // get first and last global indices on each level for this proc
-   proc_first_index = hypre_CTAlloc(HYPRE_Int, num_levels, HYPRE_MEMORY_HOST);
-   proc_last_index = hypre_CTAlloc(HYPRE_Int, num_levels, HYPRE_MEMORY_HOST);
-   global_nodes = hypre_CTAlloc(HYPRE_Int, num_levels, HYPRE_MEMORY_HOST);
-   for (level = 0; level < num_levels; level++)
-   {
-      proc_first_index[level] = hypre_ParVectorFirstIndex(F_array[level]);
-      proc_last_index[level] = hypre_ParVectorLastIndex(F_array[level]);
-      global_nodes[level] = hypre_ParCSRMatrixGlobalNumRows(A_array[level]);
-   }
 
    // Restrict residual down to all levels (or just to the transition level) and initialize composite grids
    for (level = 0; level < transition_level-1; level++)
@@ -668,11 +655,6 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
    HYPRE_Int test_failed = TestResComm(amg_data);
    #endif
 
-   // Cleanup memory
-   hypre_TFree(proc_first_index, HYPRE_MEMORY_HOST);
-   hypre_TFree(proc_last_index, HYPRE_MEMORY_HOST);
-   hypre_TFree(global_nodes, HYPRE_MEMORY_HOST);
-   
    #if TEST_RES_COMM
    return test_failed;
    #else
