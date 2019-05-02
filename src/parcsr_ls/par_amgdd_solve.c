@@ -34,6 +34,12 @@ HYPRE_Int
 UnpackResidualBuffer( HYPRE_Complex *recv_buffer, HYPRE_Int **recv_map, HYPRE_Int *num_recv_nodes, hypre_ParCompGrid **compGrid, HYPRE_Int current_level, HYPRE_Int num_levels );
 
 HYPRE_Int
+PackResidualBufferSingle( float *send_buffer, HYPRE_Int **send_flag, HYPRE_Int *num_send_nodes, hypre_ParCompGrid **compGrid, HYPRE_Int current_level, HYPRE_Int num_levels );
+
+HYPRE_Int
+UnpackResidualBufferSingle( float *recv_buffer, HYPRE_Int **recv_map, HYPRE_Int *num_recv_nodes, hypre_ParCompGrid **compGrid, HYPRE_Int current_level, HYPRE_Int num_levels );
+
+HYPRE_Int
 TestResComm(hypre_ParAMGData *amg_data);
 
 HYPRE_Int
@@ -349,6 +355,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
    hypre_ParVector            *Vtemp;
    hypre_ParCompGrid          **compGrid;
    HYPRE_Int                  compress;
+   HYPRE_Int                  low_precision_comm;
 
    // info from comp grid comm pkg
    hypre_ParCompGridCommPkg   *compGridCommPkg;
@@ -365,6 +372,8 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
    // temporary arrays used for communication during comp grid setup
    HYPRE_Complex              **send_buffer;
    HYPRE_Complex              **recv_buffer;
+   float              **send_buffer_single;
+   float              **recv_buffer_single;
 
    // temporary vectors used to copy data into composite grid structures
    hypre_Vector      *residual_local;
@@ -385,6 +394,7 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
    compGrid = hypre_ParAMGDataCompGrid(amg_data);
    compGridCommPkg = hypre_ParAMGDataCompGridCommPkg(amg_data);
    compress = hypre_ParAMGDataUseZFPCompression(amg_data);
+   low_precision_comm = hypre_ParAMGDataLowPrecisionComm(amg_data);
 
    // get info from comp grid comm pkg
    HYPRE_Int transition_level = hypre_ParCompGridCommPkgTransitionLevel(compGridCommPkg);
@@ -478,10 +488,18 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
       if ( num_send_procs || num_recv_procs ) // If there are any owned nodes on this level
       {
          // allocate space for the buffers, buffer sizes, requests and status, psiComposite_send, psiComposite_recv, send and recv maps
-         recv_buffer = hypre_CTAlloc(HYPRE_Complex*, num_recv_procs, HYPRE_MEMORY_HOST);
          requests = hypre_CTAlloc(hypre_MPI_Request, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST );
          status = hypre_CTAlloc(hypre_MPI_Status, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST );
-         send_buffer = hypre_CTAlloc(HYPRE_Complex*, num_partitions, HYPRE_MEMORY_HOST);
+         if (low_precision_comm == 1) 
+         {
+            send_buffer_single = hypre_CTAlloc(float*, num_partitions, HYPRE_MEMORY_HOST);
+            recv_buffer_single = hypre_CTAlloc(float*, num_recv_procs, HYPRE_MEMORY_HOST);
+         }
+         else
+         {
+            send_buffer = hypre_CTAlloc(HYPRE_Complex*, num_partitions, HYPRE_MEMORY_HOST);
+            recv_buffer = hypre_CTAlloc(HYPRE_Complex*, num_recv_procs, HYPRE_MEMORY_HOST);
+         }
          request_counter = 0;
 
          // Setup extra arrays to hold compressed buffers, sizes, and MPI requests/statuses if using compression
@@ -507,12 +525,20 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
          {
             if (send_buffer_size[level][i])
             {
-               send_buffer[i] = hypre_CTAlloc(HYPRE_Complex, send_buffer_size[level][i], HYPRE_MEMORY_HOST);
-               PackResidualBuffer(send_buffer[i], send_flag[level][i], num_send_nodes[level][i], compGrid, level, num_levels);
-               if (compress)
+               if (low_precision_comm == 1)
                {
-                  // Compress the send buffer and get the compressed size
-                  compressed_send_buffer_size[i] = MyZFPCompress(amg_data, send_buffer[i], send_buffer_size[level][i], &(compressed_send_buffer[i]), 0, 0, zfp_errors);
+                  send_buffer_single[i] = hypre_CTAlloc(float, send_buffer_size[level][i], HYPRE_MEMORY_HOST);
+                  PackResidualBufferSingle(send_buffer_single[i], send_flag[level][i], num_send_nodes[level][i], compGrid, level, num_levels);
+               }
+               else
+               {
+                  send_buffer[i] = hypre_CTAlloc(HYPRE_Complex, send_buffer_size[level][i], HYPRE_MEMORY_HOST);
+                  PackResidualBuffer(send_buffer[i], send_flag[level][i], num_send_nodes[level][i], compGrid, level, num_levels);
+                  if (compress)
+                  {
+                     // Compress the send buffer and get the compressed size
+                     compressed_send_buffer_size[i] = MyZFPCompress(amg_data, send_buffer[i], send_buffer_size[level][i], &(compressed_send_buffer[i]), 0, 0, zfp_errors);
+                  }
                }
             }
          }
@@ -561,13 +587,21 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
          {
             if (recv_buffer_size[level][i])
             {
-               recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, recv_buffer_size[level][i], HYPRE_MEMORY_HOST );
-               if (compress)
+               if (low_precision_comm == 1)
                {
-                  compressed_recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, compressed_recv_buffer_size[i], HYPRE_MEMORY_HOST);
-                  hypre_MPI_Irecv( compressed_recv_buffer[i], compressed_recv_buffer_size[i], MPI_BYTE, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+                  recv_buffer_single[i] = hypre_CTAlloc(float, recv_buffer_size[level][i], HYPRE_MEMORY_HOST );
+                  hypre_MPI_Irecv( recv_buffer_single[i], recv_buffer_size[level][i], MPI_FLOAT, recv_procs[level][i], 3, comm, &requests[request_counter++]);
                }
-               else hypre_MPI_Irecv( recv_buffer[i], recv_buffer_size[level][i], HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+               else
+               {
+                  recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, recv_buffer_size[level][i], HYPRE_MEMORY_HOST );
+                  if (compress)
+                  {
+                     compressed_recv_buffer[i] = hypre_CTAlloc(HYPRE_Complex, compressed_recv_buffer_size[i], HYPRE_MEMORY_HOST);
+                     hypre_MPI_Irecv( compressed_recv_buffer[i], compressed_recv_buffer_size[i], MPI_BYTE, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+                  }
+                  else hypre_MPI_Irecv( recv_buffer[i], recv_buffer_size[level][i], HYPRE_MPI_COMPLEX, recv_procs[level][i], 3, comm, &requests[request_counter++]);
+               }
             }
          }
 
@@ -577,12 +611,19 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
             HYPRE_Int buffer_index = hypre_ParCompGridCommPkgSendProcPartitions(compGridCommPkg)[level][i];
             if (send_buffer_size[level][buffer_index])
             {
-               if (compress)
+               if (low_precision_comm == 1)
                {
-                  hypre_MPI_Isend(compressed_send_buffer[buffer_index], compressed_send_buffer_size[buffer_index], MPI_BYTE, send_procs[level][i], 3, comm, &requests[request_counter++]);
-                  if (communication_cost) communication_cost[level*7 + 5] += compressed_send_buffer_size[buffer_index];
+                  hypre_MPI_Isend(send_buffer_single[buffer_index], send_buffer_size[level][buffer_index], MPI_FLOAT, send_procs[level][i], 3, comm, &requests[request_counter++]);
                }
-               else hypre_MPI_Isend(send_buffer[buffer_index], send_buffer_size[level][buffer_index], HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
+               else
+               {
+                  if (compress)
+                  {
+                     hypre_MPI_Isend(compressed_send_buffer[buffer_index], compressed_send_buffer_size[buffer_index], MPI_BYTE, send_procs[level][i], 3, comm, &requests[request_counter++]);
+                     if (communication_cost) communication_cost[level*7 + 5] += compressed_send_buffer_size[buffer_index];
+                  }
+                  else hypre_MPI_Isend(send_buffer[buffer_index], send_buffer_size[level][buffer_index], HYPRE_MPI_COMPLEX, send_procs[level][i], 3, comm, &requests[request_counter++]);
+               }
             }
          }
 
@@ -591,19 +632,30 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
 
          hypre_TFree(requests, HYPRE_MEMORY_HOST);
          hypre_TFree(status, HYPRE_MEMORY_HOST);
-         for (i = 0; i < num_partitions; i++)
-         {
-            hypre_TFree(send_buffer[i], HYPRE_MEMORY_HOST);
-         }
-         hypre_TFree(send_buffer, HYPRE_MEMORY_HOST);
-         if (compress)
+         if (low_precision_comm == 1)
          {
             for (i = 0; i < num_partitions; i++)
             {
-               hypre_TFree(compressed_send_buffer[i], HYPRE_MEMORY_HOST);
+               hypre_TFree(send_buffer_single[i], HYPRE_MEMORY_HOST);
             }
-            hypre_TFree(compressed_send_buffer, HYPRE_MEMORY_HOST);
-            hypre_TFree(compressed_send_buffer_size, HYPRE_MEMORY_HOST);
+            hypre_TFree(send_buffer_single, HYPRE_MEMORY_HOST);
+         }
+         else
+         {
+            for (i = 0; i < num_partitions; i++)
+            {
+               hypre_TFree(send_buffer[i], HYPRE_MEMORY_HOST);
+            }
+            hypre_TFree(send_buffer, HYPRE_MEMORY_HOST);
+            if (compress)
+            {
+               for (i = 0; i < num_partitions; i++)
+               {
+                  hypre_TFree(compressed_send_buffer[i], HYPRE_MEMORY_HOST);
+               }
+               hypre_TFree(compressed_send_buffer, HYPRE_MEMORY_HOST);
+               hypre_TFree(compressed_send_buffer_size, HYPRE_MEMORY_HOST);
+            }
          }
 
          // loop over received buffers
@@ -611,30 +663,49 @@ hypre_BoomerAMGDDResidualCommunication( void *amg_vdata, HYPRE_Int *communicatio
          {
             if (recv_buffer_size[level][i])
             {
-               // if necessary, decompress the recv buffer
-               if (compress)
+               if (low_precision_comm == 1)
                {
-                  MyZFPCompress(amg_data, recv_buffer[i], recv_buffer_size[level][i], &(compressed_recv_buffer[i]), compressed_recv_buffer_size[i], 1, NULL);
+                  UnpackResidualBufferSingle(recv_buffer_single[i], recv_map[level][i], num_recv_nodes[level][i], compGrid, level, num_levels);
                }
-               // unpack the buffers
-               UnpackResidualBuffer(recv_buffer[i], recv_map[level][i], num_recv_nodes[level][i], compGrid, level, num_levels);
+               else
+               {
+                  // if necessary, decompress the recv buffer
+                  if (compress)
+                  {
+                     MyZFPCompress(amg_data, recv_buffer[i], recv_buffer_size[level][i], &(compressed_recv_buffer[i]), compressed_recv_buffer_size[i], 1, NULL);
+                  }
+                  // unpack the buffers
+                  UnpackResidualBuffer(recv_buffer[i], recv_map[level][i], num_recv_nodes[level][i], compGrid, level, num_levels);
+               }
             }
          }
 
-         // clean up memory for this level
-         for (i = 0; i < num_recv_procs; i++)
+         if (low_precision_comm == 1)
          {
-            hypre_TFree(recv_buffer[i], HYPRE_MEMORY_HOST);
-         }
-         hypre_TFree(recv_buffer, HYPRE_MEMORY_HOST);
-         if (compress)
-         {
+            // clean up memory for this level
             for (i = 0; i < num_recv_procs; i++)
             {
-               hypre_TFree(compressed_recv_buffer[i], HYPRE_MEMORY_HOST);
+               hypre_TFree(recv_buffer_single[i], HYPRE_MEMORY_HOST);
             }
-            hypre_TFree(compressed_recv_buffer, HYPRE_MEMORY_HOST);
-            hypre_TFree(compressed_recv_buffer_size, HYPRE_MEMORY_HOST);
+            hypre_TFree(recv_buffer_single, HYPRE_MEMORY_HOST);
+         }
+         else
+         {
+            // clean up memory for this level
+            for (i = 0; i < num_recv_procs; i++)
+            {
+               hypre_TFree(recv_buffer[i], HYPRE_MEMORY_HOST);
+            }
+            hypre_TFree(recv_buffer, HYPRE_MEMORY_HOST);
+            if (compress)
+            {
+               for (i = 0; i < num_recv_procs; i++)
+               {
+                  hypre_TFree(compressed_recv_buffer[i], HYPRE_MEMORY_HOST);
+               }
+               hypre_TFree(compressed_recv_buffer, HYPRE_MEMORY_HOST);
+               hypre_TFree(compressed_recv_buffer_size, HYPRE_MEMORY_HOST);
+            }
          }
       }
 
@@ -697,6 +768,40 @@ UnpackResidualBuffer( HYPRE_Complex *recv_buffer, HYPRE_Int **recv_map, HYPRE_In
    return 0;
 }
 
+HYPRE_Int
+PackResidualBufferSingle( float *send_buffer, HYPRE_Int **send_flag, HYPRE_Int *num_send_nodes, hypre_ParCompGrid **compGrid, HYPRE_Int current_level, HYPRE_Int num_levels )
+{
+   HYPRE_Int                  level,i,cnt = 0;
+
+   // pack the send buffer
+   for (level = current_level; level < num_levels; level++)
+   {
+      for (i = 0; i < num_send_nodes[level]; i++)
+      {
+         send_buffer[cnt++] = (float) hypre_ParCompGridF(compGrid[level])[ send_flag[level][i] ];
+      }
+   }
+
+   return 0;
+
+}
+
+HYPRE_Int
+UnpackResidualBufferSingle( float *recv_buffer, HYPRE_Int **recv_map, HYPRE_Int *num_recv_nodes, hypre_ParCompGrid **compGrid, HYPRE_Int current_level, HYPRE_Int num_levels)
+{
+   HYPRE_Int                  level,i,cnt = 0, map_cnt, num_nodes;
+
+   // loop over levels
+   for (level = current_level; level < num_levels; level++)
+   {
+      for (i = 0; i < num_recv_nodes[level]; i++) 
+      {
+         hypre_ParCompGridF(compGrid[level])[ recv_map[level][i] ] = (HYPRE_Complex) recv_buffer[cnt++];
+      }
+   }
+
+   return 0;
+}
 HYPRE_Int
 TestResComm(hypre_ParAMGData *amg_data)
 {

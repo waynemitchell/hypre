@@ -741,7 +741,11 @@ hypre_BoomerAMGDDSetup( void *amg_vdata,
          {
             HYPRE_Int buffer_index = hypre_ParCompGridCommPkgSendProcPartitions(compGridCommPkg)[level][i];
             // If using compression, we will count the buffer sizes during the solve phase
-            if (!hypre_ParAMGDataUseZFPCompression(amg_data)) communication_cost[level*7 + 5] += hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]*sizeof(HYPRE_Complex);
+            if (!hypre_ParAMGDataUseZFPCompression(amg_data))
+            {
+               if (hypre_ParAMGDataLowPrecisionComm(amg_data) == 1) communication_cost[level*7 + 5] += hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]*sizeof(float);
+               else communication_cost[level*7 + 5] += hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]*sizeof(HYPRE_Complex);
+            }
             if (hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]) communication_cost[level*7 + 4]++;
          }
          if (hypre_ParCompGridCommPkgAggLocalComms(compGridCommPkg)[level])

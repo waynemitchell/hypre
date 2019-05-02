@@ -123,6 +123,7 @@ typedef struct
    double                    zfp_rate;
    double                    zfp_precision;
    double                    zfp_accuracy;
+   HYPRE_Int                 low_precision_comm;
 
    /* Block data */
    hypre_ParCSRBlockMatrix **A_block_array;
@@ -398,6 +399,7 @@ typedef struct
 #define hypre_ParAMGDataZFPRate(amg_data) ((amg_data)->zfp_rate)
 #define hypre_ParAMGDataZFPPrecision(amg_data) ((amg_data)->zfp_precision)
 #define hypre_ParAMGDataZFPAccuracy(amg_data) ((amg_data)->zfp_accuracy)
+#define hypre_ParAMGDataLowPrecisionComm(amg_data) ((amg_data)->low_precision_comm)
 
 /* block */
 #define hypre_ParAMGDataABlockArray(amg_data) ((amg_data)->A_block_array)
