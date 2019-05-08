@@ -390,7 +390,7 @@ FAC_Simple_Restrict( hypre_ParCompGrid *compGrid_f, hypre_ParCompGrid *compGrid_
    for (i = 0; i < hypre_ParCompGridNumNodes(compGrid_f); i++)
    {
       // Initialize res to RHS
-      HYPRE_Complex res = hypre_ParCompGridF(compGrid_f)[i];
+      HYPRE_DD_Type res = hypre_ParCompGridF(compGrid_f)[i];
 
       // Loop over entries in A
       for (j = hypre_ParCompGridARowPtr(compGrid_f)[i]; j < hypre_ParCompGridARowPtr(compGrid_f)[i+1]; j++)
@@ -425,12 +425,12 @@ FAC_Jacobi( hypre_ParCompGrid *compGrid )
 {
    HYPRE_Int               i, j; // loop variables
    HYPRE_Int               is_real;
-   HYPRE_Complex           diag; // placeholder for the diagonal of A
-   HYPRE_Complex           u_before;
+   HYPRE_DD_Type           diag; // placeholder for the diagonal of A
+   HYPRE_DD_Type           u_before;
 
 
    // Temporary vector to calculate Jacobi sweep
-   if (!hypre_ParCompGridTemp(compGrid)) hypre_ParCompGridTemp(compGrid) = hypre_CTAlloc(HYPRE_Complex, hypre_ParCompGridNumNodes(compGrid), HYPRE_MEMORY_HOST);
+   if (!hypre_ParCompGridTemp(compGrid)) hypre_ParCompGridTemp(compGrid) = hypre_CTAlloc(HYPRE_DD_Type, hypre_ParCompGridNumNodes(compGrid), HYPRE_MEMORY_HOST);
 
    // Do Jacobi relaxation on the real nodes
    for (i = 0; i < hypre_ParCompGridNumNodes(compGrid); i++)
@@ -484,8 +484,8 @@ FAC_GaussSeidel( hypre_ParCompGrid *compGrid )
 {
    HYPRE_Int               i, j; // loop variables
    HYPRE_Int               is_real;
-   HYPRE_Complex           diag; // placeholder for the diagonal of A
-   HYPRE_Complex           u_before;
+   HYPRE_DD_Type           diag; // placeholder for the diagonal of A
+   HYPRE_DD_Type           u_before;
 
    // Do Gauss-Seidel relaxation on the real nodes
    for (i = 0; i < hypre_ParCompGridNumNodes(compGrid); i++)

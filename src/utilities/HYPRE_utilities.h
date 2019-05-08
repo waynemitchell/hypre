@@ -96,6 +96,17 @@ typedef HYPRE_Real HYPRE_Complex;
 #define HYPRE_MPI_COMPLEX HYPRE_MPI_REAL
 #endif
 
+#define HYPRE_DD_SINGLE
+
+#if defined(HYPRE_DD_SINGLE)
+typedef float HYPRE_DD_Type;
+#define HYPRE_MPI_DD_TYPE MPI_FLOAT
+#else
+typedef HYPRE_Complex HYPRE_DD_Type;
+#define HYPRE_MPI_DD_TYPE HYPRE_MPI_COMPLEX
+#endif
+
+
 /*--------------------------------------------------------------------------
  * Sequential MPI stuff
  *--------------------------------------------------------------------------*/

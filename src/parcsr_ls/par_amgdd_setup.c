@@ -49,10 +49,10 @@ HYPRE_Int*
 AllgatherCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int *communication_cost, HYPRE_Int agglomerating_levels, HYPRE_Int *padding);
 
 HYPRE_Int 
-PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int **int_buffer, HYPRE_Complex **complex_buffer, HYPRE_Int *buffer_sizes, HYPRE_Int agglomerating_levels);
+PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int **int_buffer, HYPRE_DD_Type **complex_buffer, HYPRE_Int *buffer_sizes, HYPRE_Int agglomerating_levels);
 
 HYPRE_Int 
-UnpackCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int *recv_int_buffer, HYPRE_Complex *recv_complex_buffer, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int agglomerating_levels, HYPRE_Int *padding);
+UnpackCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int *recv_int_buffer, HYPRE_DD_Type *recv_complex_buffer, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int agglomerating_levels, HYPRE_Int *padding);
 
 HYPRE_Int
 AgglomerateProcessors(hypre_ParAMGData *amg_data, hypre_ParCompGridCommPkg *initCopyCompGridCommPkg, HYPRE_Int *padding, HYPRE_Int level, HYPRE_Int partition_size, HYPRE_Int *communication_cost);
@@ -744,7 +744,7 @@ hypre_BoomerAMGDDSetup( void *amg_vdata,
             if (!hypre_ParAMGDataUseZFPCompression(amg_data))
             {
                if (hypre_ParAMGDataLowPrecisionComm(amg_data) == 1) communication_cost[level*7 + 5] += hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]*sizeof(float);
-               else communication_cost[level*7 + 5] += hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]*sizeof(HYPRE_Complex);
+               else communication_cost[level*7 + 5] += hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]*sizeof(HYPRE_DD_Type);
             }
             if (hypre_ParCompGridCommPkgSendBufferSize(compGridCommPkg)[level][buffer_index]) communication_cost[level*7 + 4]++;
          }
@@ -757,7 +757,7 @@ hypre_BoomerAMGDDSetup( void *amg_vdata,
             for (i = level; i < transition_level; i++)
             {
                if (i > level && hypre_ParCompGridCommPkgAggLocalComms(compGridCommPkg)[i]) break;
-               communication_cost[i*7 + 5] += sizeof(HYPRE_Complex)*(local_num_procs-1)*(hypre_ParCompGridOwnedBlockStarts(compGrid[i])[local_myid+1] - hypre_ParCompGridOwnedBlockStarts(compGrid[i])[local_myid]);
+               communication_cost[i*7 + 5] += sizeof(HYPRE_DD_Type)*(local_num_procs-1)*(hypre_ParCompGridOwnedBlockStarts(compGrid[i])[local_myid+1] - hypre_ParCompGridOwnedBlockStarts(compGrid[i])[local_myid]);
             }
          }
       }
@@ -1396,7 +1396,7 @@ AllgatherCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int fine_
    // Pack up the buffer containing comp grid info that will be gathered onto all procs and get its size
    HYPRE_Int *buffer_sizes = hypre_CTAlloc(HYPRE_Int, 2, HYPRE_MEMORY_HOST);
    HYPRE_Int *send_int_buffer;
-   HYPRE_Complex *send_complex_buffer;
+   HYPRE_DD_Type *send_complex_buffer;
    PackCoarseLevels(amg_data, fine_level, coarse_level, &send_int_buffer, &send_complex_buffer, buffer_sizes, agglomerating_levels);
 
    // Do an allreduce to find the maximum buffer size
@@ -1428,16 +1428,16 @@ AllgatherCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int fine_
 
    // Allocate a buffer to recieve comp grid info from all procs and do the allgather
    HYPRE_Int *recv_int_buffer = hypre_CTAlloc(HYPRE_Int, int_disps[num_procs-1] + int_sizes[num_procs-1], HYPRE_MEMORY_HOST);
-   HYPRE_Complex *recv_complex_buffer = hypre_CTAlloc(HYPRE_Complex, complex_disps[num_procs-1] + complex_sizes[num_procs-1], HYPRE_MEMORY_HOST);
+   HYPRE_DD_Type *recv_complex_buffer = hypre_CTAlloc(HYPRE_DD_Type, complex_disps[num_procs-1] + complex_sizes[num_procs-1], HYPRE_MEMORY_HOST);
 
    hypre_MPI_Allgatherv(send_int_buffer, buffer_sizes[0], HYPRE_MPI_INT, recv_int_buffer, int_sizes, int_disps, HYPRE_MPI_INT, comm);
-   hypre_MPI_Allgatherv(send_complex_buffer, buffer_sizes[1], HYPRE_MPI_COMPLEX, recv_complex_buffer, complex_sizes, complex_disps, HYPRE_MPI_COMPLEX, comm);
+   hypre_MPI_Allgatherv(send_complex_buffer, buffer_sizes[1], HYPRE_MPI_DD_TYPE, recv_complex_buffer, complex_sizes, complex_disps, HYPRE_MPI_DD_TYPE, comm);
    if (communication_cost)
    {
       communication_cost[fine_level*7 + 2] += 2*log(num_procs)/log(2);
-      communication_cost[fine_level*7 + 3] += (num_procs-1)*sizeof(HYPRE_Int)*buffer_sizes[0] + (num_procs-1)*sizeof(HYPRE_Complex)*buffer_sizes[1];
+      communication_cost[fine_level*7 + 3] += (num_procs-1)*sizeof(HYPRE_Int)*buffer_sizes[0] + (num_procs-1)*sizeof(HYPRE_DD_Type)*buffer_sizes[1];
       communication_cost[fine_level*7 + 4] += log(num_procs)/log(2);
-      communication_cost[fine_level*7 + 5] += (num_procs-1)*sizeof(HYPRE_Complex)*hypre_ParCSRMatrixNumRows(hypre_ParAMGDataAArray(amg_data)[fine_level]);
+      communication_cost[fine_level*7 + 5] += (num_procs-1)*sizeof(HYPRE_DD_Type)*hypre_ParCSRMatrixNumRows(hypre_ParAMGDataAArray(amg_data)[fine_level]);
    }
 
    // Unpack the recv buffer and generate the comp grid structures for the coarse levels
@@ -1495,7 +1495,7 @@ AllgatherCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int fine_
 }
 
 HYPRE_Int
-PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int **int_buffer, HYPRE_Complex **complex_buffer, HYPRE_Int *buffer_sizes, HYPRE_Int agglomerating_levels)
+PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int **int_buffer, HYPRE_DD_Type **complex_buffer, HYPRE_Int *buffer_sizes, HYPRE_Int agglomerating_levels)
 {
    // The buffers will have the following forms:
    // int_buffer = [ [level], (fine_level)           level = [ global index start,
@@ -1540,7 +1540,7 @@ PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coa
 
    // Allocate and pack the buffer
    (*int_buffer) = hypre_CTAlloc(HYPRE_Int, buffer_sizes[0], HYPRE_MEMORY_HOST);
-   (*complex_buffer) = hypre_CTAlloc(HYPRE_Complex, buffer_sizes[1], HYPRE_MEMORY_HOST);
+   (*complex_buffer) = hypre_CTAlloc(HYPRE_DD_Type, buffer_sizes[1], HYPRE_MEMORY_HOST);
    HYPRE_Int int_cnt = 0;
    HYPRE_Int complex_cnt = 0;
    for (level = fine_level; level < coarse_level; level++)
@@ -1587,7 +1587,7 @@ PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coa
       {
          hypre_ParCSRMatrixGetRow( A, first_index + i, &row_size, &row_col_ind, &row_values );
          for (j = 0; j < row_size; j++) (*int_buffer)[int_cnt++] = row_col_ind[j];
-         for (j = 0; j < row_size; j++) (*complex_buffer)[complex_cnt++] = row_values[j];
+         for (j = 0; j < row_size; j++) (*complex_buffer)[complex_cnt++] = (HYPRE_DD_Type) row_values[j];
          hypre_ParCSRMatrixRestoreRow( A, first_index + i, &row_size, &row_col_ind, &row_values );
       }
 
@@ -1605,7 +1605,7 @@ PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coa
          {
             hypre_ParCSRMatrixGetRow( P, first_index + i, &row_size, &row_col_ind, &row_values );
             for (j = 0; j < row_size; j++) (*int_buffer)[int_cnt++] = row_col_ind[j];
-            for (j = 0; j < row_size; j++) (*complex_buffer)[complex_cnt++] = row_values[j];
+            for (j = 0; j < row_size; j++) (*complex_buffer)[complex_cnt++] = (HYPRE_DD_Type) row_values[j];
             hypre_ParCSRMatrixRestoreRow( P, first_index + i, &row_size, &row_col_ind, &row_values );
          }
       }
@@ -1615,7 +1615,7 @@ PackCoarseLevels(hypre_ParAMGData *amg_data, HYPRE_Int fine_level, HYPRE_Int coa
 }
 
 HYPRE_Int
-UnpackCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int *recv_int_buffer, HYPRE_Complex *recv_complex_buffer, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int agglomerating_levels, HYPRE_Int *padding)
+UnpackCoarseLevels(hypre_ParAMGData *amg_data, MPI_Comm comm, HYPRE_Int *recv_int_buffer, HYPRE_DD_Type *recv_complex_buffer, HYPRE_Int fine_level, HYPRE_Int coarse_level, HYPRE_Int agglomerating_levels, HYPRE_Int *padding)
 {
    // Get MPI comm size
    HYPRE_Int   num_procs;
@@ -3296,13 +3296,13 @@ CommunicateRemainingMatrixInfo(hypre_ParCompGrid **compGrid, hypre_ParCompGridCo
    hypre_MPI_Comm_size(hypre_MPI_COMM_WORLD, &num_procs);
 
    HYPRE_Int ***temp_PColInd = hypre_CTAlloc(HYPRE_Int**, transition_level, HYPRE_MEMORY_HOST);
-   HYPRE_Complex ***temp_PData = hypre_CTAlloc(HYPRE_Complex**, transition_level, HYPRE_MEMORY_HOST);
+   HYPRE_DD_Type ***temp_PData = hypre_CTAlloc(HYPRE_DD_Type**, transition_level, HYPRE_MEMORY_HOST);
    for (outer_level = 0; outer_level < transition_level; outer_level++)
    {
       HYPRE_Int num_owned_nodes = hypre_ParCompGridOwnedBlockStarts(compGrid[outer_level])[hypre_ParCompGridNumOwnedBlocks(compGrid[outer_level])];
       temp_PColInd[outer_level] = hypre_CTAlloc(HYPRE_Int*, hypre_ParCompGridNumNodes(compGrid[outer_level])
          - num_owned_nodes, HYPRE_MEMORY_HOST);
-      temp_PData[outer_level] = hypre_CTAlloc(HYPRE_Complex*, hypre_ParCompGridNumNodes(compGrid[outer_level])
+      temp_PData[outer_level] = hypre_CTAlloc(HYPRE_DD_Type*, hypre_ParCompGridNumNodes(compGrid[outer_level])
          - num_owned_nodes, HYPRE_MEMORY_HOST);
    }
 
@@ -3361,7 +3361,7 @@ CommunicateRemainingMatrixInfo(hypre_ParCompGrid **compGrid, hypre_ParCompGridCo
 
 
          HYPRE_Int **int_recv_buffers = hypre_CTAlloc(HYPRE_Int*, num_recv_procs, HYPRE_MEMORY_HOST);
-         HYPRE_Complex **complex_recv_buffers = hypre_CTAlloc(HYPRE_Complex*, num_recv_procs, HYPRE_MEMORY_HOST);
+         HYPRE_DD_Type **complex_recv_buffers = hypre_CTAlloc(HYPRE_DD_Type*, num_recv_procs, HYPRE_MEMORY_HOST);
 
          // Communicate buffer sizes 
          hypre_MPI_Request *size_requests = hypre_CTAlloc(hypre_MPI_Request, num_send_procs + num_recv_procs, HYPRE_MEMORY_HOST);
@@ -3397,12 +3397,12 @@ CommunicateRemainingMatrixInfo(hypre_ParCompGrid **compGrid, hypre_ParCompGridCo
          request_cnt = 0;
          hypre_MPI_Status *buf_statuses = hypre_CTAlloc(hypre_MPI_Status, 2*(num_send_procs + num_recv_procs), HYPRE_MEMORY_HOST);
          HYPRE_Int **int_send_buffers = hypre_CTAlloc(HYPRE_Int*, num_comm_partitions, HYPRE_MEMORY_HOST);
-         HYPRE_Complex **complex_send_buffers = hypre_CTAlloc(HYPRE_Complex*, num_comm_partitions, HYPRE_MEMORY_HOST);
+         HYPRE_DD_Type **complex_send_buffers = hypre_CTAlloc(HYPRE_DD_Type*, num_comm_partitions, HYPRE_MEMORY_HOST);
          for (part = 0; part < num_comm_partitions; part++)
          {
             // Allocate
             int_send_buffers[part] = hypre_CTAlloc(HYPRE_Int, send_sizes[2*part], HYPRE_MEMORY_HOST);
-            complex_send_buffers[part] = hypre_CTAlloc(HYPRE_Complex, send_sizes[2*part+1], HYPRE_MEMORY_HOST);
+            complex_send_buffers[part] = hypre_CTAlloc(HYPRE_DD_Type, send_sizes[2*part+1], HYPRE_MEMORY_HOST);
 
             // Pack
             HYPRE_Int int_cnt = 0;
@@ -3456,11 +3456,11 @@ CommunicateRemainingMatrixInfo(hypre_ParCompGrid **compGrid, hypre_ParCompGridCo
          {
             HYPRE_Int buffer_index = hypre_ParCompGridCommPkgSendProcPartitions(compGridCommPkg)[outer_level][proc];
             hypre_MPI_Isend(int_send_buffers[buffer_index], send_sizes[2*buffer_index], HYPRE_MPI_INT, send_procs[proc], 2, hypre_MPI_COMM_WORLD, &(buf_requests[request_cnt++]));
-            hypre_MPI_Isend(complex_send_buffers[buffer_index], send_sizes[2*buffer_index+1], HYPRE_MPI_COMPLEX, send_procs[proc], 3, hypre_MPI_COMM_WORLD, &(buf_requests[request_cnt++]));
+            hypre_MPI_Isend(complex_send_buffers[buffer_index], send_sizes[2*buffer_index+1], HYPRE_MPI_DD_TYPE, send_procs[proc], 3, hypre_MPI_COMM_WORLD, &(buf_requests[request_cnt++]));
             if (communication_cost)
             {
                communication_cost[outer_level*7 + 2] += 2;
-               communication_cost[outer_level*7 + 3] += send_sizes[2*proc]*sizeof(HYPRE_Int) + send_sizes[2*proc+1]*sizeof(HYPRE_Complex);
+               communication_cost[outer_level*7 + 3] += send_sizes[2*proc]*sizeof(HYPRE_Int) + send_sizes[2*proc+1]*sizeof(HYPRE_DD_Type);
             }
          }
 
@@ -3471,9 +3471,9 @@ CommunicateRemainingMatrixInfo(hypre_ParCompGrid **compGrid, hypre_ParCompGridCo
          for (proc = 0; proc < num_recv_procs; proc++)
          {
             int_recv_buffers[proc] = hypre_CTAlloc(HYPRE_Int, recv_sizes[2*proc], HYPRE_MEMORY_HOST);
-            complex_recv_buffers[proc] = hypre_CTAlloc(HYPRE_Complex, recv_sizes[2*proc+1], HYPRE_MEMORY_HOST);
+            complex_recv_buffers[proc] = hypre_CTAlloc(HYPRE_DD_Type, recv_sizes[2*proc+1], HYPRE_MEMORY_HOST);
             hypre_MPI_Irecv(int_recv_buffers[proc], recv_sizes[2*proc], HYPRE_MPI_INT, recv_procs[proc], 2, hypre_MPI_COMM_WORLD, &(buf_requests[request_cnt++]));
-            hypre_MPI_Irecv(complex_recv_buffers[proc], recv_sizes[2*proc+1], HYPRE_MPI_COMPLEX, recv_procs[proc], 3, hypre_MPI_COMM_WORLD, &(buf_requests[request_cnt++]));
+            hypre_MPI_Irecv(complex_recv_buffers[proc], recv_sizes[2*proc+1], HYPRE_MPI_DD_TYPE, recv_procs[proc], 3, hypre_MPI_COMM_WORLD, &(buf_requests[request_cnt++]));
          }
 
          // Wait on buffers
@@ -3521,7 +3521,7 @@ CommunicateRemainingMatrixInfo(hypre_ParCompGrid **compGrid, hypre_ParCompGridCo
                      if (!temp_PColInd[level][temp_idx])
                      {
                         temp_PColInd[level][temp_idx] = hypre_CTAlloc(HYPRE_Int, row_size, HYPRE_MEMORY_HOST);
-                        temp_PData[level][temp_idx] = hypre_CTAlloc(HYPRE_Complex, row_size, HYPRE_MEMORY_HOST);
+                        temp_PData[level][temp_idx] = hypre_CTAlloc(HYPRE_DD_Type, row_size, HYPRE_MEMORY_HOST);
 
                         for (j = 0; j < row_size; j++)
                         {
@@ -3820,15 +3820,15 @@ TestCompGrids2(hypre_ParCompGrid **compGrid, hypre_ParCompGridCommPkg *compGridC
          hypre_MPI_Bcast(A_colInd, nnz_A, HYPRE_MPI_INT, proc, hypre_MPI_COMM_WORLD);
 
          // Broadcast the A data
-         HYPRE_Complex *A_data;
+         HYPRE_DD_Type *A_data;
          if (myid == proc) A_data = hypre_ParCompGridAData(compGrid[level]);
-         else A_data = hypre_CTAlloc(HYPRE_Complex, nnz_A, HYPRE_MEMORY_HOST);
-         hypre_MPI_Bcast(A_data, nnz_A, HYPRE_MPI_COMPLEX, proc, hypre_MPI_COMM_WORLD);
+         else A_data = hypre_CTAlloc(HYPRE_DD_Type, nnz_A, HYPRE_MEMORY_HOST);
+         hypre_MPI_Bcast(A_data, nnz_A, HYPRE_MPI_DD_TYPE, proc, hypre_MPI_COMM_WORLD);
 
          HYPRE_Int *coarse_global_indices;
          HYPRE_Int *P_rowPtr;
          HYPRE_Int *P_colInd;
-         HYPRE_Complex *P_data;
+         HYPRE_DD_Type *P_data;
          if (level != num_levels-1)
          {
             // Broadcast the coarse global indices
@@ -3848,8 +3848,8 @@ TestCompGrids2(hypre_ParCompGrid **compGrid, hypre_ParCompGridCommPkg *compGridC
 
             // Broadcast the P data
             if (myid == proc) P_data = hypre_ParCompGridPData(compGrid[level]);
-            else P_data = hypre_CTAlloc(HYPRE_Complex, nnz_P, HYPRE_MEMORY_HOST);
-            hypre_MPI_Bcast(P_data, nnz_P, HYPRE_MPI_COMPLEX, proc, hypre_MPI_COMM_WORLD);
+            else P_data = hypre_CTAlloc(HYPRE_DD_Type, nnz_P, HYPRE_MEMORY_HOST);
+            hypre_MPI_Bcast(P_data, nnz_P, HYPRE_MPI_DD_TYPE, proc, hypre_MPI_COMM_WORLD);
          }
 
          // Now, each processors checks their owned info against the composite grid info
@@ -3879,7 +3879,7 @@ TestCompGrids2(hypre_ParCompGrid **compGrid, hypre_ParCompGridCommPkg *compGridC
                            // hypre_printf("Error: proc %d has incorrect A col index at global index %d on level %d, checked by rank %d\n", proc, global_indices[i], level, myid);
                            test_failed = 1;
                         }
-                        if (A_data[j] != row_values[j - A_rowPtr[i]])
+                        if (A_data[j] != (HYPRE_DD_Type) row_values[j - A_rowPtr[i]])
                         {
                            // hypre_printf("Error: proc %d has incorrect A data at global index %d on level %d, checked by rank %d\n", proc, global_indices[i], level, myid);
                            test_failed = 1;
@@ -3905,7 +3905,7 @@ TestCompGrids2(hypre_ParCompGrid **compGrid, hypre_ParCompGridCommPkg *compGridC
                            // hypre_printf("Error: proc %d has incorrect P col index at global index %d on level %d, checked by rank %d\n", proc, global_indices[i], level, myid);
                            test_failed = 1;
                         }
-                        if (P_data[j] != row_values[j - P_rowPtr[i]])
+                        if (P_data[j] != (HYPRE_DD_Type) row_values[j - P_rowPtr[i]])
                         {
                            // hypre_printf("Error: proc %d has incorrect P data at global index %d on level %d, checked by rank %d\n", proc, global_indices[i], level, myid);
                            test_failed = 1;

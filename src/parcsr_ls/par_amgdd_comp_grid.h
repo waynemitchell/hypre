@@ -112,11 +112,11 @@ typedef struct
    HYPRE_Int       A_mem_size;
    HYPRE_Int       P_mem_size;
 
-   HYPRE_Complex     *u;
-   HYPRE_Complex     *f;
-   HYPRE_Complex     *t;
-   HYPRE_Complex     *s;
-   HYPRE_Complex     *temp;
+   HRYPE_DD_Type     *u;
+   HRYPE_DD_Type     *f;
+   HRYPE_DD_Type     *t;
+   HRYPE_DD_Type     *s;
+   HRYPE_DD_Type     *temp;
 
    HYPRE_Int        *global_indices;
    HYPRE_Int        *coarse_global_indices; 
@@ -125,11 +125,11 @@ typedef struct
    HYPRE_Int        *A_rowptr;
    HYPRE_Int        *A_colind;
    HYPRE_Int        *A_global_colind;
-   HYPRE_Complex    *A_data;
+   HRYPE_DD_Type    *A_data;
 
    HYPRE_Int        *P_rowptr;
    HYPRE_Int        *P_colind;
-   HYPRE_Complex    *P_data;
+   HRYPE_DD_Type    *P_data;
 
 
 
