@@ -355,6 +355,8 @@ typedef struct
    hypre_AMGDDCompGrid       **amgdd_comp_grid;
    hypre_AMGDDCommPkg        *amgdd_comm_pkg;
    HYPRE_Int       (*amgddUserFACRelaxation)( hypre_AMGDDCompGrid*, hypre_AMGDDCompGridMatrix*, hypre_AMGDDCompGridVector*, hypre_AMGDDCompGridVector* );
+   HYPRE_Int                 partial_cycle_coarsest_level;
+   HYPRE_Int                 partial_cycle_control;
 
    /* Block data */
    hypre_ParCSRBlockMatrix **A_block_array;
@@ -645,6 +647,8 @@ typedef struct
 #define hypre_ParAMGDataAMGDDCompGrid(amg_data) ((amg_data)->amgdd_comp_grid)
 #define hypre_ParAMGDataAMGDDCommPkg(amg_data) ((amg_data)->amgdd_comm_pkg)
 #define hypre_ParAMGDataAMGDDUserFACRelaxation(amg_data) ((amg_data)->amgddUserFACRelaxation)
+#define hypre_ParAMGDataPartialCycleCoarsestLevel(amg_data) ((amg_data)->partial_cycle_coarsest_level)
+#define hypre_ParAMGDataPartialCycleControl(amg_data) ((amg_data)->partial_cycle_control)
 
 /* block */
 #define hypre_ParAMGDataABlockArray(amg_data) ((amg_data)->A_block_array)

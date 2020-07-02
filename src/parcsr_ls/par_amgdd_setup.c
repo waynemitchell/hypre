@@ -448,7 +448,7 @@ hypre_BoomerAMGDDSetup( void *amg_vdata,
    // Test whether comp grids have correct shape
    HYPRE_Int test_failed = 0;
    HYPRE_Int error_code;
-   error_code = TestCompGrids1(compGrid, num_levels, padding, num_ghost_layers, 0, 1);
+   error_code = TestCompGrids1(compGrid, num_levels, padding, num_ghost_layers, amgdd_start_level, 1);
    if (error_code)
    {
       hypre_printf("TestCompGrids1 failed!\n");

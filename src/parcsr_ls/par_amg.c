@@ -360,6 +360,8 @@ hypre_BoomerAMGCreate()
    hypre_ParAMGDataAMGDDCompGrid(amg_data) = NULL;
    hypre_ParAMGDataAMGDDCommPkg(amg_data) = NULL;
    hypre_ParAMGDataAMGDDUserFACRelaxation(amg_data) = hypre_BoomerAMGDD_FAC_CFL1Jacobi;
+   hypre_ParAMGDataPartialCycleCoarsestLevel(amg_data) = -1;
+   hypre_ParAMGDataPartialCycleControl(amg_data) = -1;
 
 #ifdef CUMNUMIT
    hypre_ParAMGDataCumNumIterations(amg_data) = cum_num_iterations;

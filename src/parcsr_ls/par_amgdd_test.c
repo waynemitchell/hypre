@@ -1768,7 +1768,7 @@ TestCompGrids2(hypre_ParAMGData *amg_data)
    for (proc = 0; proc < num_procs; proc++)
    {
       HYPRE_Int level;
-      for (level = 0; level < num_levels; level++)
+      for (level = hypre_ParAMGDataAMGDDStartLevel(amg_data); level < num_levels; level++)
       {
          /////////////////////////////////
          // Broadcast all info
