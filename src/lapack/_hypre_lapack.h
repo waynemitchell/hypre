@@ -115,6 +115,9 @@ HYPRE_Int hypre_dgetri ( HYPRE_Int *n, HYPRE_Real *a, HYPRE_Int *lda, HYPRE_Int 
 /* dgetrs.c */
 HYPRE_Int hypre_dgetrs ( const char *trans , HYPRE_Int *n , HYPRE_Int *nrhs , HYPRE_Real *a , HYPRE_Int *lda , HYPRE_Int *ipiv , HYPRE_Real *b , HYPRE_Int *ldb , HYPRE_Int *info );
 
+/* dgtsv.c */
+HYPRE_Int hypre_dgtsv (HYPRE_Int *n, HYPRE_Int *nrhs, HYPRE_Real *dl, HYPRE_Real *d__, HYPRE_Real *du, HYPRE_Real *b, HYPRE_Int *ldb, HYPRE_Int *info);
+
 /* dlasq1.c */
 HYPRE_Int hypre_dlasq1 ( HYPRE_Int *n , HYPRE_Real *d__ , HYPRE_Real *e , HYPRE_Real *work , HYPRE_Int *info );
 

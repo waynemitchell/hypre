@@ -26,6 +26,9 @@ HYPRE_Int
 FAC_FCycle(void *amg_vdata, HYPRE_Int first_iteration);
 
 HYPRE_Int
+FAC_TwoLevel(void *amg_vdata);
+
+HYPRE_Int
 FAC_Cycle_timed(void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int time_part);
 
 HYPRE_Int 
@@ -54,6 +57,7 @@ hypre_BoomerAMGDD_FAC_Cycle( void *amg_vdata, HYPRE_Int first_iteration )
 
    if (cycle_type == 1 || cycle_type == 2) FAC_Cycle(amg_vdata, hypre_ParAMGDataAMGDDStartLevel(amg_data), cycle_type, first_iteration);
    else if (cycle_type == 3) FAC_FCycle(amg_vdata, first_iteration);
+   else if (cycle_type == 4) FAC_TwoLevel(amg_vdata);
    else
    {
       if (myid == 0) hypre_printf("Error: unknown cycle type\n");
@@ -73,6 +77,7 @@ hypre_BoomerAMGDD_FAC_Cycle_timed( void *amg_vdata, HYPRE_Int time_part )
 
    if (cycle_type == 1 || cycle_type == 2) FAC_Cycle_timed(amg_vdata, hypre_ParAMGDataAMGDDStartLevel(amg_data), cycle_type, time_part);
    else if (cycle_type == 3) FAC_FCycle_timed(amg_vdata, time_part);
+   else if (cycle_type == 4) FAC_TwoLevel(amg_vdata);
    else
    {
       if (myid == 0) hypre_printf("Error: unknown cycle type\n");
@@ -172,6 +177,53 @@ HYPRE_Int FAC_Cycle(void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPR
    sprintf(filename, "outputs/actual/u%d_level%d_relax2", myid, level);
    hypre_SeqVectorPrint(hypre_AMGDDCompGridU(compGrid[level]), filename);
    #endif
+
+   return 0;
+}
+
+HYPRE_Int FAC_TwoLevel(void *amg_vdata)
+{
+   HYPRE_Int   myid, num_procs;
+   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
+   hypre_MPI_Comm_size(hypre_MPI_COMM_WORLD, &num_procs );
+
+   HYPRE_Int i;
+
+   // Get the AMG structure
+   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
+   HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
+   HYPRE_Int relax_type = hypre_ParAMGDataAMGDDFACRelaxType(amg_data);
+   HYPRE_Int *numRelax = hypre_ParAMGDataNumGridSweeps(amg_data);
+
+   // Get the composite grid
+   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDataAMGDDCompGrid(amg_data);
+
+   // Relax on fine grid
+   FAC_Relax(amg_data, compGrid[0], 1);
+
+   // Restrict
+   FAC_Restrict( compGrid[0], compGrid[1], 0 );
+   hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[0]), 0.0 );
+   hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[0]), 0.0 );
+
+   // Call many cycles on level 1 (approximate solve)
+   for (i = 0; i < 10; i++)
+   {
+      FAC_Cycle( amg_vdata, 1, 1, 0 );
+   }
+   // !!! Debug: report residual on level 1
+   hypre_AMGDDCompGridVector *tmp = hypre_AMGDDCompGridVectorCreate();
+   hypre_AMGDDCompGridVectorInitialize(tmp, hypre_AMGDDCompGridNumOwnedNodes(compGrid[1]), hypre_AMGDDCompGridNumNonOwnedNodes(compGrid[1]), hypre_AMGDDCompGridNumNonOwnedRealNodes(compGrid[1]));
+   hypre_AMGDDCompGridVectorCopy(hypre_AMGDDCompGridF(compGrid[1]), tmp);
+   hypre_AMGDDCompGridMatvec(-1.0, hypre_AMGDDCompGridA(compGrid[1]), hypre_AMGDDCompGridU(compGrid[1]), 1.0, tmp);
+   HYPRE_Real res_norm = sqrt( hypre_AMGDDCompGridVectorRealInnerProd(tmp, tmp) );
+   HYPRE_Real f_norm = sqrt( hypre_AMGDDCompGridVectorRealInnerProd(hypre_AMGDDCompGridF(compGrid[1]), hypre_AMGDDCompGridF(compGrid[1])) );
+   if (myid == 0) printf("   Level 1 res norm = %e, relative res norm = %e\n", res_norm, res_norm / f_norm);
+
+
+   // Interpolate and post relax
+   FAC_Interpolate( compGrid[0], compGrid[1] );
+   FAC_Relax(amg_data, compGrid[0], 2);
 
    return 0;
 }

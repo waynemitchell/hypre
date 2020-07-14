@@ -57,6 +57,7 @@
 #define dgetrf_  hypre_dgetrf
 #define dgetri_  hypre_dgetri
 #define dgetrs_  hypre_dgetrs
+#define dgtsv_   hypre_dgtsv
 #define dlasq1_  hypre_dlasq1
 #define dlasq2_  hypre_dlasq2
 #define dlasrt_  hypre_dlasrt
