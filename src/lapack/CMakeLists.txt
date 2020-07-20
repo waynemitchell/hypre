@@ -18,6 +18,7 @@ target_sources(HYPRE
   dgetri.c
   dgetrs.c
   dgetf2.c
+  dgtsv.c
   dlabad.c
   dlabrd.c
   dlacpy.c
