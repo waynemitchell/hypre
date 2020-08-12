@@ -28,8 +28,6 @@ C_COMPILE_FLAGS =\
  $(DSUPERLU_INCLUDE)\
  ${CINCLUDES}
 
-CXX_COMPILE_FLAGS = ${C_COMPILE_FLAGS}
-
 HEADERS =\
  HYPRE_parcsr_ls.h\
  _hypre_parcsr_ls.h\
@@ -37,6 +35,7 @@ HEADERS =\
  block_tridiag.h\
  Common.h\
  par_amg.h\
+ par_amgdd.h\
  par_amgdd_comp_grid.h\
  schwarz.h
 
@@ -62,6 +61,7 @@ FILES =\
  F90_HYPRE_ams.c\
  gen_redcs_mat.c\
  HYPRE_parcsr_amg.c\
+ HYPRE_parcsr_amgdd.c\
  HYPRE_parcsr_bicgstab.c\
  HYPRE_parcsr_block.c\
  HYPRE_parcsr_cgnr.c\
@@ -83,12 +83,12 @@ FILES =\
  HYPRE_ame.c\
  par_2s_interp.c\
  par_amg.c\
+ par_amgdd.c\
  par_amgdd_comp_grid.c\
  par_amgdd_setup.c\
  par_amgdd_solve.c\
  par_amgdd_fac_cycle.c\
- par_amgdd_pcg.c\
- par_amgdd_test.c\
+ par_amgdd_helpers.c\
  par_amg_setup.c\
  par_amg_solve.c\
  par_amg_solveT.c\
@@ -145,9 +145,6 @@ FILES =\
  par_lr_restr.c\
  superlu.c
 
-FILESCXX = \
-par_amgdd_helpers.cxx
-
 CUFILES =\
  ams.c\
  par_coarsen_device.c\
@@ -156,13 +153,11 @@ CUFILES =\
  par_interp_trunc_device.c\
  par_lr_interp_device.c\
  par_strength_device.c\
- par_amgdd_device.c\
  par_amgdd_fac_cycle_device.c
 
 COBJS = ${FILES:.c=.o}
-OBJSCXX = ${FILESCXX:.cxx=.o}
 CUOBJS = ${CUFILES:.c=.obj}
-OBJS = ${COBJS} ${OBJSCXX} ${CUOBJS}
+OBJS = ${COBJS} ${CUOBJS}
 
 SONAME = libHYPRE_parcsr_ls-${HYPRE_RELEASE_VERSION}${HYPRE_LIB_SUFFIX}
 

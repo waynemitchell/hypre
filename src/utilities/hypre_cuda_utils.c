@@ -60,7 +60,7 @@ hypre_GetDefaultCUDAGridDimension( HYPRE_Int n,
    {
       HYPRE_Int num_warps_per_block = num_threads_per_block >> 5;
 
-      hypre_assert(num_warps_per_block * 32 == num_threads_per_block);
+      hypre_assert(num_warps_per_block * HYPRE_WARP_SIZE == num_threads_per_block);
 
       num_blocks = (n + num_warps_per_block - 1) / num_warps_per_block;
    }
@@ -377,7 +377,8 @@ hypreDevice_CsrRowPtrsToIndicesWithRowNum(HYPRE_Int nrows, HYPRE_Int nnz, HYPRE_
 
 struct hypre_empty_row_functor
 {
-   /* typedef bool result_type; */
+   // This is needed for clang
+   typedef bool result_type;
 
    __device__
    bool operator()(const thrust::tuple<HYPRE_Int, HYPRE_Int>& t) const
@@ -601,6 +602,35 @@ hypreCUDAKernel_IVAXPY(HYPRE_Int n, HYPRE_Complex *a, HYPRE_Complex *x, HYPRE_Co
 /* Inverse Vector AXPY: y[i] = x[i] / a[i] + y[i] */
 HYPRE_Int
 hypreDevice_IVAXPY(HYPRE_Int n, HYPRE_Complex *a, HYPRE_Complex *x, HYPRE_Complex *y)
+{
+   /* trivial case */
+   if (n <= 0)
+   {
+      return hypre_error_flag;
+   }
+
+   dim3 bDim = hypre_GetDefaultCUDABlockDimension();
+   dim3 gDim = hypre_GetDefaultCUDAGridDimension(n, "thread", bDim);
+
+   HYPRE_CUDA_LAUNCH( hypreCUDAKernel_IVAXPY, gDim, bDim, n, a, x, y );
+
+   return hypre_error_flag;
+}
+
+__global__ void
+hypreCUDAKernel_MaskedIVAXPY(HYPRE_Int n, HYPRE_Complex *a, HYPRE_Complex *x, HYPRE_Complex *y, HYPRE_Int *mask)
+{
+   HYPRE_Int i = hypre_cuda_get_grid_thread_id<1,1>();
+
+   if (i < n)
+   {
+      y[mask[i]] += x[mask[i]] / a[mask[i]];
+   }
+}
+
+/* Inverse Vector AXPY: y[i] = x[i] / a[i] + y[i] */
+HYPRE_Int
+hypreDevice_MaskedIVAXPY(HYPRE_Int n, HYPRE_Complex *a, HYPRE_Complex *x, HYPRE_Complex *y, HYPRE_Int *mask)
 {
    /* trivial case */
    if (n <= 0)

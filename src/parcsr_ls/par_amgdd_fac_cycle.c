@@ -1,92 +1,57 @@
-/*BHEADER**********************************************************************
- * Copyright (c) 2008,  Lawrence Livermore National Security, LLC.
- * Produced at the Lawrence Livermore National Laboratory.
- * This file is part of HYPRE.  See file COPYRIGHT for details.
+/******************************************************************************
+ * Copyright 1998-2019 Lawrence Livermore National Security, LLC and other
+ * HYPRE Project Developers. See the top-level COPYRIGHT file for details.
  *
- * HYPRE is free software; you can redistribute it and/or modify it under the
- * terms of the GNU Lesser General Public License (as published by the Free
- * Software Foundation) version 2.1 dated February 1999.
- *
- * $Revision$
- ***********************************************************************EHEADER*/
-
+ * SPDX-License-Identifier: (Apache-2.0 OR MIT)
+ ******************************************************************************/
 
 #include "_hypre_parcsr_ls.h"
-#include "par_amg.h"
-#include "par_csr_block_matrix.h"   
 
-#define DEBUG_FAC 0
-#define DUMP_INTERMEDIATE_TEST_SOLNS 0
-#define DEBUGGING_MESSAGES 0
 
 HYPRE_Int
-FAC_Cycle(void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int first_iteration);
-
-HYPRE_Int 
-FAC_FCycle(void *amg_vdata, HYPRE_Int first_iteration);
+hypre_BoomerAMGDD_FAC_Cycle(void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int first_iteration);
 
 HYPRE_Int
-FAC_TwoLevel(void *amg_vdata);
+hypre_BoomerAMGDD_FAC_FCycle(void *amgdd_vdata, HYPRE_Int first_iteration);
 
 HYPRE_Int
-FAC_Cycle_timed(void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int time_part);
-
-HYPRE_Int 
-FAC_FCycle_timed(void *amg_vdata, HYPRE_Int time_part);
+hypre_BoomerAMGDD_FAC_TwoLevel(void *amg_vdata);
 
 HYPRE_Int
-FAC_Interpolate( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c );
+hypre_BoomerAMGDD_FAC_Interpolate( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c );
 
 HYPRE_Int
-FAC_Restrict( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, HYPRE_Int first_iteration );
+hypre_BoomerAMGDD_FAC_Restrict( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, HYPRE_Int first_iteration );
 
 HYPRE_Int
-FAC_Relax(hypre_ParAMGData *amg_data, hypre_AMGDDCompGrid *compGrid, HYPRE_Int cycle_param);
+hypre_BoomerAMGDD_FAC_Relax( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
 
 HYPRE_Int
-FAC_CFL1Jacobi( hypre_AMGDDCompGrid *compGrid, HYPRE_Int relax_set );
+hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int relax_set );
 
 HYPRE_Int
-hypre_BoomerAMGDD_FAC_Cycle( void *amg_vdata, HYPRE_Int first_iteration )
+hypre_BoomerAMGDD_FAC( void *amgdd_vdata, HYPRE_Int first_iteration )
 {
    HYPRE_Int   myid;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
 
-   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
-   HYPRE_Int cycle_type = hypre_ParAMGDataAMGDDFACCycleType(amg_data);
+   hypre_ParAMGDDData   *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   HYPRE_Int cycle_type = hypre_ParAMGDDDataFACCycleType(amgdd_data);
 
-   if (cycle_type == 1 || cycle_type == 2) FAC_Cycle(amg_vdata, hypre_ParAMGDataAMGDDStartLevel(amg_data), cycle_type, first_iteration);
-   else if (cycle_type == 3) FAC_FCycle(amg_vdata, first_iteration);
-   else if (cycle_type == 4) FAC_TwoLevel(amg_vdata);
+   if (cycle_type == 1 || cycle_type == 2) hypre_BoomerAMGDD_FAC_Cycle(amgdd_vdata, hypre_ParAMGDDDataStartLevel(amgdd_data), cycle_type, first_iteration);
+   else if (cycle_type == 3) hypre_BoomerAMGDD_FAC_FCycle(amgdd_vdata, first_iteration);
+   else if (cycle_type == 4) hypre_BoomerAMGDD_FAC_TwoLevel(amg_vdata);
    else
    {
-      if (myid == 0) hypre_printf("Error: unknown cycle type\n");
+      if (myid == 0) hypre_error_w_msg(HYPRE_ERROR_GENERIC,"WARNING: unknown AMG-DD FAC cycle type. Defaulting to 1 (V-cycle).\n");
+      hypre_ParAMGDDDataFACCycleType(amgdd_data) = 1;
+      hypre_BoomerAMGDD_FAC_Cycle(amgdd_vdata, hypre_ParAMGDDDataStartLevel(amgdd_data), 1, first_iteration);
    }
 
    return 0;
 }
 
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_Cycle_timed( void *amg_vdata, HYPRE_Int time_part )
-{
-   HYPRE_Int   myid;
-   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
-
-   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
-   HYPRE_Int cycle_type = hypre_ParAMGDataAMGDDFACCycleType(amg_data);
-
-   if (cycle_type == 1 || cycle_type == 2) FAC_Cycle_timed(amg_vdata, hypre_ParAMGDataAMGDDStartLevel(amg_data), cycle_type, time_part);
-   else if (cycle_type == 3) FAC_FCycle_timed(amg_vdata, time_part);
-   else if (cycle_type == 4) FAC_TwoLevel(amg_vdata);
-   else
-   {
-      if (myid == 0) hypre_printf("Error: unknown cycle type\n");
-   }
-
-   return 0;
-}
-
-HYPRE_Int FAC_Cycle(void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int first_iteration)
+HYPRE_Int hypre_BoomerAMGDD_FAC_Cycle(void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int first_iteration)
 {
    HYPRE_Int   myid;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -95,93 +60,44 @@ HYPRE_Int FAC_Cycle(void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPR
    HYPRE_Int i;
 
    // Get the AMG structure
-   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
+   hypre_ParAMGDDData   *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_ParAMGData   *amg_data = hypre_ParAMGDDDataAMG(amgdd_data);
    HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
-   HYPRE_Int relax_type = hypre_ParAMGDataAMGDDFACRelaxType(amg_data);
 
    // Get the composite grid
-   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDataAMGDDCompGrid(amg_data);
+   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data);
 
    // Relax on the real nodes
-   #if DEBUGGING_MESSAGES
-   printf("Rank %d, relax on level %d\n", myid, level);
-   #endif
-   FAC_Relax(amg_data, compGrid[level], 1);
-
-   #if DUMP_INTERMEDIATE_TEST_SOLNS
-   sprintf(filename, "outputs/actual/u%d_level%d_relax1", myid, level);
-   hypre_SeqVectorPrint(hypre_AMGDDCompGridU(compGrid[level]), filename);
-   if (level == 0)
-   {
-     sprintf(filename, "outputs/actual/f%d_level%d", myid, level);
-     hypre_SeqVectorPrint(hypre_AMGDDCompGridF(compGrid[level]), filename);
-   }
-   #endif
+   hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, level, 1);
 
    // Restrict the residual at all fine points (real and ghost) and set residual at coarse points not under the fine grid
    if (num_levels > 1)
    {
-      #if DEBUGGING_MESSAGES
-      printf("Rank %d, restrict on level %d\n", myid, level);
-      #endif
-      FAC_Restrict( compGrid[level], compGrid[level+1], first_iteration );
+      hypre_BoomerAMGDD_FAC_Restrict( compGrid[level], compGrid[level+1], first_iteration );
       hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[level]), 0.0 );
       hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[level]), 0.0 );
-
-      #if DUMP_INTERMEDIATE_TEST_SOLNS
-      sprintf(filename, "outputs/actual/f%d_level%d", myid, level+1);
-      hypre_SeqVectorPrint(hypre_AMGDDCompGridF(compGrid[level+1]), filename);
-      #endif
 
       //  Either solve on the coarse level or recurse
       if (level+1 == num_levels-1)
       {
-         #if DEBUGGING_MESSAGES
-         printf("Rank %d, coarse solve on level %d\n", myid, num_levels-1);
-         #endif
-         FAC_Relax(amg_data, compGrid[num_levels-1], 3);
-
-         #if DUMP_INTERMEDIATE_TEST_SOLNS
-         sprintf(filename, "outputs/actual/u%d_level%d_relax2", myid, num_levels-1);
-         hypre_SeqVectorPrint(hypre_AMGDDCompGridU(compGrid[num_levels-1]), filename);
-         #endif
-
+         hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, num_levels-1, 3);
       }
       else for (i = 0; i < cycle_type; i++)
       {
-         #if DEBUGGING_MESSAGES
-         printf("Rank %d, recurse on level %d\n", myid, level);
-         #endif
-         FAC_Cycle(amg_vdata, level+1, cycle_type, first_iteration);
+         hypre_BoomerAMGDD_FAC_Cycle(amgdd_vdata, level+1, cycle_type, first_iteration);
          first_iteration = 0;
       }
 
       // Interpolate up and relax
-      #if DEBUGGING_MESSAGES
-      printf("Rank %d, interpolate on level %d\n", myid, level);
-      #endif
-      FAC_Interpolate( compGrid[level], compGrid[level+1] );
+      hypre_BoomerAMGDD_FAC_Interpolate( compGrid[level], compGrid[level+1] );
    }
 
-   #if DUMP_INTERMEDIATE_TEST_SOLNS
-   sprintf(filename, "outputs/actual/u%d_level%d_project", myid, level);
-   hypre_SeqVectorPrint(hypre_AMGDDCompGridU(compGrid[level]), filename);
-   #endif
-
-   #if DEBUGGING_MESSAGES
-   printf("Rank %d, relax on level %d\n", myid, level);
-   #endif
-   FAC_Relax(amg_data, compGrid[level], 2);
-
-   #if DUMP_INTERMEDIATE_TEST_SOLNS
-   sprintf(filename, "outputs/actual/u%d_level%d_relax2", myid, level);
-   hypre_SeqVectorPrint(hypre_AMGDDCompGridU(compGrid[level]), filename);
-   #endif
+   hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, level, 2);
 
    return 0;
 }
 
-HYPRE_Int FAC_TwoLevel(void *amg_vdata)
+HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amg_vdata)
 {
    HYPRE_Int   myid, num_procs;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -199,17 +115,17 @@ HYPRE_Int FAC_TwoLevel(void *amg_vdata)
    hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDataAMGDDCompGrid(amg_data);
 
    // Relax on fine grid
-   FAC_Relax(amg_data, compGrid[0], 1);
+   hypre_BoomerAMGDD_FAC_Relax(amg_data, compGrid[0], 1);
 
    // Restrict
-   FAC_Restrict( compGrid[0], compGrid[1], 0 );
+   hypre_BoomerAMGDD_FAC_Restrict( compGrid[0], compGrid[1], 0 );
    hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[0]), 0.0 );
    hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[0]), 0.0 );
 
    // Call many cycles on level 1 (approximate solve)
    for (i = 0; i < 10; i++)
    {
-      FAC_Cycle( amg_vdata, 1, 1, 0 );
+      hypre_BoomerAMGDD_FAC_Cycle( amg_vdata, 1, 1, 0 );
    }
    // !!! Debug: report residual on level 1
    hypre_AMGDDCompGridVector *tmp = hypre_AMGDDCompGridVectorCreate();
@@ -222,13 +138,13 @@ HYPRE_Int FAC_TwoLevel(void *amg_vdata)
 
 
    // Interpolate and post relax
-   FAC_Interpolate( compGrid[0], compGrid[1] );
-   FAC_Relax(amg_data, compGrid[0], 2);
+   hypre_BoomerAMGDD_FAC_Interpolate( compGrid[0], compGrid[1] );
+   hypre_BoomerAMGDD_FAC_Relax(amg_data, compGrid[0], 2);
 
    return 0;
 }
 
-HYPRE_Int FAC_FCycle(void *amg_vdata, HYPRE_Int first_iteration)
+HYPRE_Int hypre_BoomerAMGDD_FAC_FCycle(void *amgdd_vdata, HYPRE_Int first_iteration)
 {
    HYPRE_Int   myid, num_procs;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -237,141 +153,57 @@ HYPRE_Int FAC_FCycle(void *amg_vdata, HYPRE_Int first_iteration)
    HYPRE_Int level, i;
 
    // Get the AMG structure
-   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
+   hypre_ParAMGDDData   *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_ParAMGData   *amg_data = hypre_ParAMGDDDataAMG(amgdd_data);
    HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
-   HYPRE_Int relax_type = hypre_ParAMGDataAMGDDFACRelaxType(amg_data);
-   HYPRE_Int *numRelax = hypre_ParAMGDataNumGridSweeps(amg_data);
 
    // Get the composite grid
-   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDataAMGDDCompGrid(amg_data);
+   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data);
 
-   // ... work down to coarsest ... 
+   // ... work down to coarsest ...
    if (!first_iteration)
    {
-      for (level = hypre_ParAMGDataAMGDDStartLevel(amg_data); level < num_levels - 1; level++)
+      for (level = hypre_ParAMGDDDataStartLevel(amgdd_data); level < num_levels - 1; level++)
       {
-         FAC_Restrict( compGrid[level], compGrid[level+1], 0 );
+         hypre_BoomerAMGDD_FAC_Restrict( compGrid[level], compGrid[level+1], 0 );
          hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[level]), 0.0 );
          hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[level]), 0.0 );
       }
    }
 
    //  ... solve on coarsest level ...
-   FAC_Relax(amg_data, compGrid[num_levels-1], 3);
+   hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, num_levels-1, 3);
 
    // ... and work back up to the finest
-   for (level = num_levels - 2; level > hypre_ParAMGDataAMGDDStartLevel(amg_data)-1; level--)
+   for (level = num_levels - 2; level > -1; level--)
    {
       // Interpolate up and relax
-      FAC_Interpolate( compGrid[level], compGrid[level+1] );
+      hypre_BoomerAMGDD_FAC_Interpolate( compGrid[level], compGrid[level+1] );
 
       // V-cycle
-      FAC_Cycle( amg_vdata, level, 1, 0 );
-   }
-
-   return 0;
-}
-
-HYPRE_Int FAC_Cycle_timed(void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int time_part)
-{
-   HYPRE_Int   myid;
-   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
-
-   HYPRE_Int i; // loop variables
-
-   // Get the AMG structure
-   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
-   HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
-   HYPRE_Int relax_type = hypre_ParAMGDataAMGDDFACRelaxType(amg_data);
-   HYPRE_Int *numRelax = hypre_ParAMGDataNumGridSweeps(amg_data);
-
-   // Get the composite grid
-   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDataAMGDDCompGrid(amg_data);
-
-   // Relax on the real nodes
-   FAC_Relax(amg_data, compGrid[level], 1);
-
-   // Restrict the residual at all fine points (real and ghost) and set residual at coarse points not under the fine grid
-   if (time_part == 2)
-   {
-      FAC_Restrict( compGrid[level], compGrid[level+1], 1 );
-      hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[level]), 0.0 );
-      hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[level]), 0.0 );
-   }
-
-   //  Either solve on the coarse level or recurse
-   if (level+1 == num_levels-1) FAC_Relax(amg_data, compGrid[num_levels-1], 3);
-   else for (i = 0; i < cycle_type; i++) FAC_Cycle_timed(amg_vdata, level+1, cycle_type, time_part);
-
-   // Interpolate up and relax
-   if (time_part == 3) FAC_Interpolate( compGrid[level], compGrid[level+1] );
-
-   FAC_Relax(amg_data, compGrid[level], 2);
-
-   return 0;
-}
-
-HYPRE_Int FAC_FCycle_timed(void *amg_vdata, HYPRE_Int time_part)
-{
-   HYPRE_Int   myid, num_procs;
-   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
-   hypre_MPI_Comm_size(hypre_MPI_COMM_WORLD, &num_procs );
-
-   HYPRE_Int level, i;
-
-   // Get the AMG structure
-   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
-   HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
-   HYPRE_Int relax_type = hypre_ParAMGDataAMGDDFACRelaxType(amg_data);
-   HYPRE_Int *numRelax = hypre_ParAMGDataNumGridSweeps(amg_data);
-
-   // Get the composite grid
-   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDataAMGDDCompGrid(amg_data);
-
-   // ... work down to coarsest ... 
-   for (level = hypre_ParAMGDataAMGDDStartLevel(amg_data); level < num_levels - 1; level++)
-   {
-      if (time_part == 2)
-      {
-         FAC_Restrict( compGrid[level], compGrid[level+1], 0 );
-         hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[level]), 0.0 );
-         hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[level]), 0.0 );
-      }
-   }
-
-   //  ... solve on coarsest level ...
-   if (time_part == 1) FAC_Relax(amg_data, compGrid[num_levels-1], 3);
-
-   // ... and work back up to the finest
-   for (level = num_levels - 2; level > hypre_ParAMGDataAMGDDStartLevel(amg_data)-1; level--)
-   {
-      // Interpolate up and relax
-      if (time_part == 3) FAC_Interpolate( compGrid[level], compGrid[level+1] );
-
-      // V-cycle
-      FAC_Cycle_timed( amg_vdata, level, 1, time_part );
+      hypre_BoomerAMGDD_FAC_Cycle( amgdd_vdata, level, 1, 0 );
    }
 
    return 0;
 }
 
 HYPRE_Int
-FAC_Interpolate( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c )
+hypre_BoomerAMGDD_FAC_Interpolate( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c )
 {
    hypre_AMGDDCompGridMatvec(1.0, hypre_AMGDDCompGridP(compGrid_f), hypre_AMGDDCompGridU(compGrid_c), 1.0, hypre_AMGDDCompGridU(compGrid_f));
    return 0;
 }
 
 HYPRE_Int
-FAC_Restrict( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, HYPRE_Int first_iteration )
+hypre_BoomerAMGDD_FAC_Restrict( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, HYPRE_Int first_iteration )
 {
    // Recalculate residual on coarse grid
    if (!first_iteration) hypre_AMGDDCompGridMatvec(-1.0, hypre_AMGDDCompGridA(compGrid_c), hypre_AMGDDCompGridU(compGrid_c), 1.0, hypre_AMGDDCompGridF(compGrid_c));
 
-   // Get update: s_l <- A_lt_l + s_l 
+   // Get update: s_l <- A_lt_l + s_l
    hypre_AMGDDCompGridMatvec(1.0, hypre_AMGDDCompGridA(compGrid_f), hypre_AMGDDCompGridT(compGrid_f), 1.0, hypre_AMGDDCompGridS(compGrid_f));
 
-   // If we need to preserve the updates on the next level 
+   // If we need to preserve the updates on the next level
    if (hypre_AMGDDCompGridS(compGrid_c))
    {
       hypre_AMGDDCompGridMatvec(1.0, hypre_AMGDDCompGridR(compGrid_f), hypre_AMGDDCompGridS(compGrid_f), 0.0, hypre_AMGDDCompGridS(compGrid_c));
@@ -392,48 +224,56 @@ FAC_Restrict( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, 
 }
 
 HYPRE_Int
-FAC_Relax(hypre_ParAMGData *amg_data, hypre_AMGDDCompGrid *compGrid, HYPRE_Int cycle_param)
+hypre_BoomerAMGDD_FAC_Relax( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param )
 {
-    HYPRE_Int *numRelax = hypre_ParAMGDataNumGridSweeps(amg_data);
-    hypre_AMGDDCompGridCycleParam(compGrid) = cycle_param;
-    HYPRE_Int i;
+   hypre_ParAMGDDData *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_AMGDDCompGrid *compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data)[level];
+   hypre_ParAMGData *amg_data = hypre_ParAMGDDDataAMG(amgdd_data);
+   HYPRE_Int numRelax = hypre_ParAMGDDDataFACNumRelax(amgdd_data);
+   HYPRE_Int i;
 
-    if (hypre_AMGDDCompGridT(compGrid) || hypre_AMGDDCompGridQ(compGrid))
+   if (hypre_AMGDDCompGridT(compGrid) || hypre_AMGDDCompGridQ(compGrid))
+   {
+      hypre_AMGDDCompGridVectorCopy(hypre_AMGDDCompGridU(compGrid), hypre_AMGDDCompGridTemp(compGrid));
+      hypre_AMGDDCompGridVectorScale(-1.0, hypre_AMGDDCompGridTemp(compGrid));
+   }
+
+    for (i = 0; i < numRelax; i++)
     {
-        hypre_AMGDDCompGridVectorCopy(hypre_AMGDDCompGridU(compGrid), hypre_AMGDDCompGridTemp(compGrid));
-        hypre_AMGDDCompGridVectorScale(-1.0, hypre_AMGDDCompGridTemp(compGrid));
+       (*hypre_ParAMGDDDataUserFACRelaxation(amgdd_data))( amgdd_vdata, level, cycle_param );
     }
 
-    if (hypre_ParAMGDataAMGDDFACUsePCG(amg_data))
-    {
-        HYPRE_PCGSetMaxIter(hypre_AMGDDCompGridPCGSolver(compGrid), numRelax[cycle_param]);
-        (*hypre_ParAMGDataAMGDDUserFACRelaxation(amg_data))( compGrid, hypre_AMGDDCompGridA(compGrid), hypre_AMGDDCompGridF(compGrid), hypre_AMGDDCompGridU(compGrid) );
-    }
-    else
-    {
-        for (i = 0; i < numRelax[cycle_param]; i++)
-            (*hypre_ParAMGDataAMGDDUserFACRelaxation(amg_data))( compGrid, hypre_AMGDDCompGridA(compGrid), hypre_AMGDDCompGridF(compGrid), hypre_AMGDDCompGridU(compGrid) );
-    }
-    
-    if (hypre_AMGDDCompGridT(compGrid) || hypre_AMGDDCompGridQ(compGrid))
-    {
-        hypre_AMGDDCompGridVectorAxpy(1.0, hypre_AMGDDCompGridU(compGrid), hypre_AMGDDCompGridTemp(compGrid));
-        if (hypre_AMGDDCompGridT(compGrid)) hypre_AMGDDCompGridVectorAxpy(1.0, hypre_AMGDDCompGridTemp(compGrid), hypre_AMGDDCompGridT(compGrid));
-        if (hypre_AMGDDCompGridQ(compGrid)) hypre_AMGDDCompGridVectorAxpy(1.0, hypre_AMGDDCompGridTemp(compGrid), hypre_AMGDDCompGridQ(compGrid));
-    }
-    return 0;
+   if (hypre_AMGDDCompGridT(compGrid) || hypre_AMGDDCompGridQ(compGrid))
+   {
+      hypre_AMGDDCompGridVectorAxpy(1.0, hypre_AMGDDCompGridU(compGrid), hypre_AMGDDCompGridTemp(compGrid));
+      if (hypre_AMGDDCompGridT(compGrid))
+      {
+         hypre_AMGDDCompGridVectorAxpy(1.0, hypre_AMGDDCompGridTemp(compGrid), hypre_AMGDDCompGridT(compGrid));
+      }
+      if (hypre_AMGDDCompGridQ(compGrid))
+      {
+         hypre_AMGDDCompGridVectorAxpy(1.0, hypre_AMGDDCompGridTemp(compGrid), hypre_AMGDDCompGridQ(compGrid));
+      }
+   }
+
+   return 0;
 }
 
 HYPRE_Int
-hypre_BoomerAMGDD_FAC_Jacobi( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCompGridMatrix *A, hypre_AMGDDCompGridVector *f, hypre_AMGDDCompGridVector *u )
+hypre_BoomerAMGDD_FAC_Jacobi( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param )
 {
-
 #if defined(HYPRE_USING_CUDA)
-   return hypre_BoomerAMGDD_FAC_Jacobi_device(compGrid, A, f, u);
+   return hypre_BoomerAMGDD_FAC_Jacobi_device(amgdd_vdata, level);
 #endif
-   
-   HYPRE_Int i,j; 
-   HYPRE_Real relax_weight = hypre_AMGDDCompGridRelaxWeight(compGrid);
+
+   HYPRE_Int i,j;
+
+   hypre_ParAMGDDData *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_AMGDDCompGrid *compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data)[level];
+   hypre_AMGDDCompGridMatrix *A = hypre_AMGDDCompGridA(compGrid);
+   hypre_AMGDDCompGridVector *f = hypre_AMGDDCompGridF(compGrid);
+   hypre_AMGDDCompGridVector *u = hypre_AMGDDCompGridU(compGrid);
+   HYPRE_Real relax_weight = hypre_ParAMGDDDataFACRelaxWeight(amgdd_data);
 
    // Calculate l1_norms if necessary (right now, I'm just using this vector for the diagonal of A and doing straight ahead Jacobi)
    if (!hypre_AMGDDCompGridL1Norms(compGrid))
@@ -480,10 +320,16 @@ hypre_BoomerAMGDD_FAC_Jacobi( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCompGrid
 }
 
 HYPRE_Int
-hypre_BoomerAMGDD_FAC_GaussSeidel( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCompGridMatrix *A, hypre_AMGDDCompGridVector *f, hypre_AMGDDCompGridVector *u )
+hypre_BoomerAMGDD_FAC_GaussSeidel( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param )
 {
    HYPRE_Int               i, j; // loop variables
    HYPRE_Complex           diagonal; // placeholder for the diagonal of A
+
+   hypre_ParAMGDDData *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_AMGDDCompGrid *compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data)[level];
+   hypre_AMGDDCompGridMatrix *A = hypre_AMGDDCompGridA(compGrid);
+   hypre_AMGDDCompGridVector *f = hypre_AMGDDCompGridF(compGrid);
+   hypre_AMGDDCompGridVector *u = hypre_AMGDDCompGridU(compGrid);
 
    // Get all the info
    HYPRE_Complex *u_owned_data = hypre_VectorData(hypre_AMGDDCompGridVectorOwned(u));
@@ -514,7 +360,7 @@ hypre_BoomerAMGDD_FAC_GaussSeidel( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCom
          u_owned_data[i] -= hypre_CSRMatrixData(owned_offd)[j] * u_nonowned_data[ hypre_CSRMatrixJ(owned_offd)[j] ];
       }
       // Divide by diagonal
-      if (diagonal == 0.0) printf("Tried to divide by zero diagonal in Gauss-Seidel!\n");
+      if (diagonal == 0.0) hypre_error_w_msg(HYPRE_ERROR_GENERIC,"WARNING: Divide by zero diagonal in hypre_BoomerAMGDD_FAC_GaussSeidel().\n");
       u_owned_data[i] /= diagonal;
    }
 
@@ -537,24 +383,30 @@ hypre_BoomerAMGDD_FAC_GaussSeidel( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCom
          u_nonowned_data[i] -= hypre_CSRMatrixData(nonowned_offd)[j] * u_owned_data[ hypre_CSRMatrixJ(nonowned_offd)[j] ];
       }
       // Divide by diagonal
-      if (diagonal == 0.0) printf("Tried to divide by zero diagonal in Gauss-Seidel!\n");
+      if (diagonal == 0.0) hypre_error_w_msg(HYPRE_ERROR_GENERIC,"WARNING: Divide by zero diagonal in hypre_BoomerAMGDD_FAC_GaussSeidel().\n");
       u_nonowned_data[i] /= diagonal;
    }
 
    return 0;
 }
 
-HYPRE_Int hypre_BoomerAMGDD_FAC_OrderedGaussSeidel( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCompGridMatrix *A, hypre_AMGDDCompGridVector *f, hypre_AMGDDCompGridVector *u )
+HYPRE_Int hypre_BoomerAMGDD_FAC_OrderedGaussSeidel( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param )
 {
    HYPRE_Int               unordered_i, i, j; // loop variables
    HYPRE_Complex           diagonal; // placeholder for the diagonal of A
 
-   if (!hypre_AMGDDCompGridOwnedRelaxOrdering(compGrid)) 
+   hypre_ParAMGDDData *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_AMGDDCompGrid *compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data)[level];
+   hypre_AMGDDCompGridMatrix *A = hypre_AMGDDCompGridA(compGrid);
+   hypre_AMGDDCompGridVector *f = hypre_AMGDDCompGridF(compGrid);
+   hypre_AMGDDCompGridVector *u = hypre_AMGDDCompGridU(compGrid);
+
+   if (!hypre_AMGDDCompGridOwnedRelaxOrdering(compGrid))
    {
       hypre_AMGDDCompGridOwnedRelaxOrdering(compGrid) = hypre_CTAlloc(HYPRE_Int, hypre_AMGDDCompGridNumOwnedNodes(compGrid), hypre_AMGDDCompGridMemoryLocation(compGrid));
       hypre_topo_sort(hypre_CSRMatrixI(hypre_AMGDDCompGridMatrixOwnedDiag(hypre_AMGDDCompGridA(compGrid))), hypre_CSRMatrixJ(hypre_AMGDDCompGridMatrixOwnedDiag(hypre_AMGDDCompGridA(compGrid))), hypre_CSRMatrixData(hypre_AMGDDCompGridMatrixOwnedDiag(hypre_AMGDDCompGridA(compGrid))), hypre_AMGDDCompGridOwnedRelaxOrdering(compGrid), hypre_AMGDDCompGridNumOwnedNodes(compGrid));
    }
-   if (!hypre_AMGDDCompGridNonOwnedRelaxOrdering(compGrid)) 
+   if (!hypre_AMGDDCompGridNonOwnedRelaxOrdering(compGrid))
    {
       hypre_AMGDDCompGridNonOwnedRelaxOrdering(compGrid) = hypre_CTAlloc(HYPRE_Int, hypre_AMGDDCompGridNumNonOwnedNodes(compGrid), hypre_AMGDDCompGridMemoryLocation(compGrid));
       hypre_topo_sort(hypre_CSRMatrixI(hypre_AMGDDCompGridMatrixNonOwnedDiag(hypre_AMGDDCompGridA(compGrid))), hypre_CSRMatrixJ(hypre_AMGDDCompGridMatrixNonOwnedDiag(hypre_AMGDDCompGridA(compGrid))), hypre_CSRMatrixData(hypre_AMGDDCompGridMatrixNonOwnedDiag(hypre_AMGDDCompGridA(compGrid))), hypre_AMGDDCompGridNonOwnedRelaxOrdering(compGrid), hypre_AMGDDCompGridNumNonOwnedNodes(compGrid));
@@ -591,7 +443,7 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_OrderedGaussSeidel( hypre_AMGDDCompGrid *compGri
          u_nonowned_data[i] -= hypre_CSRMatrixData(nonowned_offd)[j] * u_owned_data[ hypre_CSRMatrixJ(nonowned_offd)[j] ];
       }
       // Divide by diagonal
-      if (diagonal == 0.0) printf("Tried to divide by zero diagonal in Gauss-Seidel!\n");
+      if (diagonal == 0.0) hypre_error_w_msg(HYPRE_ERROR_GENERIC,"WARNING: Divide by zero diagonal in hypre_BoomerAMGDD_FAC_OrderedGaussSeidel().\n");
       u_nonowned_data[i] /= diagonal;
    }
 
@@ -616,7 +468,7 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_OrderedGaussSeidel( hypre_AMGDDCompGrid *compGri
          u_owned_data[i] -= hypre_CSRMatrixData(owned_offd)[j] * u_nonowned_data[ hypre_CSRMatrixJ(owned_offd)[j] ];
       }
       // Divide by diagonal
-      if (diagonal == 0.0) printf("Tried to divide by zero diagonal in Gauss-Seidel!\n");
+      if (diagonal == 0.0) hypre_error_w_msg(HYPRE_ERROR_GENERIC,"WARNING: Divide by zero diagonal in hypre_BoomerAMGDD_FAC_OrderedGaussSeidel().\n");
       u_owned_data[i] /= diagonal;
    }
 
@@ -625,35 +477,35 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_OrderedGaussSeidel( hypre_AMGDDCompGrid *compGri
 }
 
 HYPRE_Int
-hypre_BoomerAMGDD_FAC_CFL1Jacobi( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCompGridMatrix *A, hypre_AMGDDCompGridVector *f, hypre_AMGDDCompGridVector *u )
+hypre_BoomerAMGDD_FAC_CFL1Jacobi( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param )
 {
-
-   HYPRE_Int cycle_param = hypre_AMGDDCompGridCycleParam(compGrid);
+   hypre_ParAMGDDData *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_AMGDDCompGrid *compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data)[level];
 
 #if defined(HYPRE_USING_CUDA)
    if (cycle_param == 1)
    {
-      FAC_CFL1Jacobi_device(compGrid, 1); 
-      FAC_CFL1Jacobi_device(compGrid, 0);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_device(amgdd_vdata, level, 1);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_device(amgdd_vdata, level, 0);
    }
    else if (cycle_param == 2)
    {
-      FAC_CFL1Jacobi_device(compGrid, 0);
-      FAC_CFL1Jacobi_device(compGrid, 1);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_device(amgdd_vdata, level, 0);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_device(amgdd_vdata, level, 1);
    }
-   else FAC_CFL1Jacobi_device(compGrid, 0);
+   else hypre_BoomerAMGDD_FAC_CFL1Jacobi_device(amgdd_vdata, level, 0);
 #else
    if (cycle_param == 1)
    {
-      FAC_CFL1Jacobi(compGrid, 1); 
-      FAC_CFL1Jacobi(compGrid, 0);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu(amgdd_vdata, level, 1);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu(amgdd_vdata, level, 0);
    }
    else if (cycle_param == 2)
    {
-      FAC_CFL1Jacobi(compGrid, 0);
-      FAC_CFL1Jacobi(compGrid, 1);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu(amgdd_vdata, level, 0);
+      hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu(amgdd_vdata, level, 1);
    }
-   else FAC_CFL1Jacobi(compGrid, 0);
+   else hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu(amgdd_vdata, level, 0);
 #endif
 
    return 0;
@@ -661,11 +513,14 @@ hypre_BoomerAMGDD_FAC_CFL1Jacobi( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDComp
 
 
 HYPRE_Int
-FAC_CFL1Jacobi( hypre_AMGDDCompGrid *compGrid, HYPRE_Int relax_set )
+hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int relax_set )
 {
    HYPRE_Int            i, j;
 
-   HYPRE_Real relax_weight = hypre_AMGDDCompGridRelaxWeight(compGrid);
+   hypre_ParAMGDDData *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_AMGDDCompGrid *compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data)[level];
+
+   HYPRE_Real relax_weight = hypre_ParAMGDDDataFACRelaxWeight(amgdd_data);
 
    hypre_CSRMatrix *owned_diag = hypre_AMGDDCompGridMatrixOwnedDiag(hypre_AMGDDCompGridA(compGrid));
    hypre_CSRMatrix *owned_offd = hypre_AMGDDCompGridMatrixOwnedOffd(hypre_AMGDDCompGridA(compGrid));
@@ -754,19 +609,6 @@ FAC_CFL1Jacobi( hypre_AMGDDCompGrid *compGrid, HYPRE_Int relax_set )
    return 0;
 }
 
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_PCG( hypre_AMGDDCompGrid *compGrid, hypre_AMGDDCompGridMatrix *A, hypre_AMGDDCompGridVector *f, hypre_AMGDDCompGridVector *u )
-{
-    HYPRE_Solver pcg_solver = hypre_AMGDDCompGridPCGSolver(compGrid);
-
-    hypre_CSRMatrixMatvec(-1.0, hypre_AMGDDCompGridMatrixRealGhost(A), hypre_AMGDDCompGridVectorNonOwned(u), 1.0, hypre_AMGDDCompGridVectorNonOwned(f));
-
-    hypre_ParAMGDDPCGSolve(pcg_solver, hypre_AMGDDCompGridA(compGrid), hypre_AMGDDCompGridF(compGrid), hypre_AMGDDCompGridU(compGrid) );
-
-    hypre_CSRMatrixMatvec(1.0, hypre_AMGDDCompGridMatrixRealGhost(A), hypre_AMGDDCompGridVectorNonOwned(u), 1.0, hypre_AMGDDCompGridVectorNonOwned(f));
-    
-    return 0;
-}
 
 
 

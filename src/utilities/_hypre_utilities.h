@@ -1155,18 +1155,39 @@ HYPRE_Int hypre_DataExchangeList(HYPRE_Int num_contacts, HYPRE_Int *contact_proc
 
 #include <caliper/cali.h>
 
-#define HYPRE_ANNOTATION_BEGIN( str ) cali_begin_string_byname("hypre.kernel", str)
-#define HYPRE_ANNOTATION_END( str ) cali_end_byname("hypre.kernel")
+char hypre__levelname[16];
+
+#define HYPRE_ANNOTATE_FUNC_BEGIN          CALI_MARK_FUNCTION_BEGIN
+#define HYPRE_ANNOTATE_FUNC_END            CALI_MARK_FUNCTION_END
+#define HYPRE_ANNOTATE_LOOP_BEGIN(id, str) CALI_MARK_LOOP_BEGIN(id, str)
+#define HYPRE_ANNOTATE_LOOP_END(id)        CALI_MARK_LOOP_END(id)
+#define HYPRE_ANNOTATE_ITER_BEGIN(id, it)  CALI_MARK_ITERATION_BEGIN(id, it)
+#define HYPRE_ANNOTATE_ITER_END(id)        CALI_MARK_ITERATION_END(id)
+#define HYPRE_ANNOTATE_MGLEVEL_BEGIN(lvl)\
+{\
+   hypre_sprintf(hypre__levelname, "MG level %d", lvl);\
+   CALI_MARK_BEGIN(hypre__levelname);\
+}
+#define HYPRE_ANNOTATE_MGLEVEL_END(lvl)\
+{\
+   hypre_sprintf(hypre__levelname, "MG level %d", lvl);\
+   CALI_MARK_END(hypre__levelname);\
+}
 
 #else
 
-#define HYPRE_ANNOTATION_BEGIN( str ) 
-#define HYPRE_ANNOTATION_END( str ) 
+#define HYPRE_ANNOTATE_FUNC_BEGIN
+#define HYPRE_ANNOTATE_FUNC_END
+#define HYPRE_ANNOTATE_LOOP_BEGIN(id, str)
+#define HYPRE_ANNOTATE_LOOP_END(id)
+#define HYPRE_ANNOTATE_ITER_BEGIN(id, it)
+#define HYPRE_ANNOTATE_ITER_END(id)
+#define HYPRE_ANNOTATE_MGLEVEL_BEGIN(lvl)
+#define HYPRE_ANNOTATE_MGLEVEL_END(lvl)
 
 #endif
 
 #endif /* CALIPER_INSTRUMENTATION_HEADER */
-
 /******************************************************************************
  * Copyright 1998-2019 Lawrence Livermore National Security, LLC and other
  * HYPRE Project Developers. See the top-level COPYRIGHT file for details.
@@ -1510,6 +1531,7 @@ HYPRE_Int hypre_SyncCudaComputeStream(hypre_Handle *hypre_handle);
 HYPRE_Int hypre_SyncCudaDevice(hypre_Handle *hypre_handle);
 HYPRE_Int hypreDevice_DiagScaleVector(HYPRE_Int n, HYPRE_Int *A_i, HYPRE_Complex *A_data, HYPRE_Complex *x, HYPRE_Complex *y);
 HYPRE_Int hypreDevice_IVAXPY(HYPRE_Int n, HYPRE_Complex *a, HYPRE_Complex *x, HYPRE_Complex *y);
+HYPRE_Int hypreDevice_MaskedIVAXPY(HYPRE_Int n, HYPRE_Complex *a, HYPRE_Complex *x, HYPRE_Complex *y, HYPRE_Int *mask);
 HYPRE_Int hypreDevice_BigIntFilln(HYPRE_BigInt *d_x, size_t n, HYPRE_BigInt v);
 #endif
 
@@ -1524,4 +1546,3 @@ void hypre_NvtxPopRange();
 #endif
 
 #endif
-
