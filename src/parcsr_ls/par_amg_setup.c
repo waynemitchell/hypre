@@ -874,6 +874,13 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
 
    while (not_finished_coarsening)
    {
+#ifdef EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+      if (hypre_ParAMGDataVariableStrongThreshold(amg_data))
+      {
+         strong_threshold = hypre_ParAMGDataVariableStrongThreshold(amg_data)[level];
+         if (my_id == 0) hypre_printf("Using variable strong threshold = %f on level %d\n", strong_threshold, level);
+      }
+#endif
       /* only do nodal coarsening on a fixed number of levels */
       if (level >= nodal_levels)
       {

@@ -7,28 +7,6 @@
 
 #include "_hypre_parcsr_ls.h"
 
-
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_Cycle(void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int first_iteration);
-
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_FCycle(void *amgdd_vdata, HYPRE_Int first_iteration);
-
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_TwoLevel(void *amg_vdata);
-
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_Interpolate( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c );
-
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_Restrict( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, HYPRE_Int first_iteration );
-
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_Relax( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
-
-HYPRE_Int
-hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int relax_set );
-
 HYPRE_Int
 hypre_BoomerAMGDD_FAC( void *amgdd_vdata, HYPRE_Int first_iteration )
 {
@@ -40,7 +18,7 @@ hypre_BoomerAMGDD_FAC( void *amgdd_vdata, HYPRE_Int first_iteration )
 
    if (cycle_type == 1 || cycle_type == 2) hypre_BoomerAMGDD_FAC_Cycle(amgdd_vdata, hypre_ParAMGDDDataStartLevel(amgdd_data), cycle_type, first_iteration);
    else if (cycle_type == 3) hypre_BoomerAMGDD_FAC_FCycle(amgdd_vdata, first_iteration);
-   else if (cycle_type == 4) hypre_BoomerAMGDD_FAC_TwoLevel(amg_vdata);
+   else if (cycle_type == 4) hypre_BoomerAMGDD_FAC_TwoLevel(amgdd_vdata);
    else
    {
       if (myid == 0) hypre_error_w_msg(HYPRE_ERROR_GENERIC,"WARNING: unknown AMG-DD FAC cycle type. Defaulting to 1 (V-cycle).\n");
@@ -64,25 +42,25 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_Cycle(void *amgdd_vdata, HYPRE_Int level, HYPRE_
    hypre_ParAMGData   *amg_data = hypre_ParAMGDDDataAMG(amgdd_data);
    HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
 
-   // Get the composite grid
-   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data);
-
-   // Relax on the real nodes
-   hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, level, 1);
-
-   // Restrict the residual at all fine points (real and ghost) and set residual at coarse points not under the fine grid
-   if (num_levels > 1)
+   //  Either solve on the coarse level or relax and recurse
+   if (level == num_levels-1)
    {
+      hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, num_levels-1, 3);
+   }
+   else
+   {
+      // Get the composite grid
+      hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data);
+
+      // Relax on the real nodes
+      hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, level, 1);
+
+      // Restrict the residual at all fine points (real and ghost) and set residual at coarse points not under the fine grid
       hypre_BoomerAMGDD_FAC_Restrict( compGrid[level], compGrid[level+1], first_iteration );
       hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[level]), 0.0 );
       hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[level]), 0.0 );
 
-      //  Either solve on the coarse level or recurse
-      if (level+1 == num_levels-1)
-      {
-         hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, num_levels-1, 3);
-      }
-      else for (i = 0; i < cycle_type; i++)
+      for (i = 0; i < cycle_type; i++)
       {
          hypre_BoomerAMGDD_FAC_Cycle(amgdd_vdata, level+1, cycle_type, first_iteration);
          first_iteration = 0;
@@ -90,14 +68,14 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_Cycle(void *amgdd_vdata, HYPRE_Int level, HYPRE_
 
       // Interpolate up and relax
       hypre_BoomerAMGDD_FAC_Interpolate( compGrid[level], compGrid[level+1] );
-   }
 
-   hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, level, 2);
+      hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, level, 2);
+   }
 
    return 0;
 }
 
-HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amg_vdata)
+HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amgdd_vdata)
 {
    HYPRE_Int   myid, num_procs;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
@@ -106,16 +84,15 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amg_vdata)
    HYPRE_Int i;
 
    // Get the AMG structure
-   hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
+   hypre_ParAMGDDData   *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_ParAMGData   *amg_data = hypre_ParAMGDDDataAMG(amgdd_data);
    HYPRE_Int num_levels = hypre_ParAMGDataNumLevels(amg_data);
-   HYPRE_Int relax_type = hypre_ParAMGDataAMGDDFACRelaxType(amg_data);
-   HYPRE_Int *numRelax = hypre_ParAMGDataNumGridSweeps(amg_data);
 
    // Get the composite grid
-   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDataAMGDDCompGrid(amg_data);
+   hypre_AMGDDCompGrid          **compGrid = hypre_ParAMGDDDataCompGrid(amgdd_data);
 
    // Relax on fine grid
-   hypre_BoomerAMGDD_FAC_Relax(amg_data, compGrid[0], 1);
+   hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, 0, 1);
 
    // Restrict
    hypre_BoomerAMGDD_FAC_Restrict( compGrid[0], compGrid[1], 0 );
@@ -125,7 +102,7 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amg_vdata)
    // Call many cycles on level 1 (approximate solve)
    for (i = 0; i < 10; i++)
    {
-      hypre_BoomerAMGDD_FAC_Cycle( amg_vdata, 1, 1, 0 );
+      hypre_BoomerAMGDD_FAC_Cycle( amgdd_vdata, 1, 1, 0 );
    }
    // !!! Debug: report residual on level 1
    hypre_AMGDDCompGridVector *tmp = hypre_AMGDDCompGridVectorCreate();
@@ -139,7 +116,7 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amg_vdata)
 
    // Interpolate and post relax
    hypre_BoomerAMGDD_FAC_Interpolate( compGrid[0], compGrid[1] );
-   hypre_BoomerAMGDD_FAC_Relax(amg_data, compGrid[0], 2);
+   hypre_BoomerAMGDD_FAC_Relax(amgdd_vdata, 0, 2);
 
    return 0;
 }

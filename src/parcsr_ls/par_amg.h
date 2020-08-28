@@ -10,6 +10,8 @@
 
 #define CUMNUMIT
 
+#define EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+
 #include "par_csr_block_matrix.h"
 
 /*--------------------------------------------------------------------------
@@ -23,6 +25,9 @@ typedef struct
    /* setup params */
    HYPRE_Int      max_levels;
    HYPRE_Real     strong_threshold;
+#ifdef EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+   HYPRE_Real     *variable_strong_threshold;
+#endif
    HYPRE_Int      coarsen_cut_factor;
    HYPRE_Real     strong_thresholdR; /* theta for build R: defines strong F neighbors */
    HYPRE_Real     filter_thresholdR; /* theta for filtering R  */
@@ -269,6 +274,9 @@ typedef struct
 #define hypre_ParAMGDataMaxLevels(amg_data)            ((amg_data) -> max_levels)
 #define hypre_ParAMGDataCoarsenCutFactor(amg_data)     ((amg_data) -> coarsen_cut_factor)
 #define hypre_ParAMGDataStrongThreshold(amg_data)      ((amg_data) -> strong_threshold)
+#ifdef EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+#define hypre_ParAMGDataVariableStrongThreshold(amg_data)      ((amg_data) -> variable_strong_threshold)
+#endif
 #define hypre_ParAMGDataStrongThresholdR(amg_data)     ((amg_data) -> strong_thresholdR)
 #define hypre_ParAMGDataFilterThresholdR(amg_data)     ((amg_data) -> filter_thresholdR)
 #define hypre_ParAMGDataSabs(amg_data)                 ((amg_data) -> Sabs)

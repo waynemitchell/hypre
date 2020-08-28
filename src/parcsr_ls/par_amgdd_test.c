@@ -8,6 +8,23 @@
 #include "_hypre_parcsr_ls.h"
 
 
+HYPRE_Int SetRelaxMarker(hypre_AMGDDCompGrid *compGrid, hypre_ParVector *relax_marker, HYPRE_Int proc);
+
+HYPRE_Int
+hypre_TestBoomerAMGCycle( void              *amg_vdata,
+                   hypre_ParVector  **F_array,
+                   hypre_ParVector  **U_array,
+                   hypre_ParVector  **relax_marker,
+                   HYPRE_Int        proc,
+                   hypre_ParVector  ** Q_array   );
+
+HYPRE_Int hypre_TestBoomerAMGSolve( void               *amg_vdata,
+                   hypre_ParCSRMatrix *A,
+                   hypre_ParVector    *f,
+                   hypre_ParVector    *u,
+                   hypre_ParVector    **relax_marker,
+                   HYPRE_Int          proc,
+                   hypre_ParVector    **Q_array         );
 
 
 HYPRE_Int
@@ -127,7 +144,7 @@ hypre_BoomerAMGDDTestSolve( void      *amgdd_vdata,
       HYPRE_Int i;
       for (i = 0; i < num_comp_cycles; i++)
       {
-         TestBoomerAMGSolve(amg_data, A, res, U_comp, relax_marker, proc, Q_array);
+         hypre_TestBoomerAMGSolve(amg_data, A, res, U_comp, relax_marker, proc, Q_array);
 
 
          #if MEASURE_TEST_COMP_RES
@@ -308,7 +325,7 @@ GetTestCompositeResidual(hypre_ParCSRMatrix *A, hypre_ParVector *U_comp, hypre_P
  *--------------------------------------------------------------------*/
 
 HYPRE_Int
-TestBoomerAMGSolve( void               *amg_vdata,
+hypre_TestBoomerAMGSolve( void               *amg_vdata,
                    hypre_ParCSRMatrix *A,
                    hypre_ParVector    *f,
                    hypre_ParVector    *u,
@@ -392,7 +409,6 @@ TestBoomerAMGSolve( void               *amg_vdata,
    hypre_ParVector  *Vtemp;
    hypre_ParVector  *Residual;
 
-   HYPRE_ANNOTATION_BEGIN("BoomerAMG.solve");
    hypre_MPI_Comm_size(comm, &num_procs);   
    hypre_MPI_Comm_rank(comm,&my_id);
 
@@ -517,7 +533,6 @@ TestBoomerAMGSolve( void               *amg_vdata,
           hypre_printf("ERROR detected by Hypre ...  END\n\n\n");
         }
         hypre_error(HYPRE_ERROR_GENERIC);
-        HYPRE_ANNOTATION_END("BoomerAMG.solve");
         return hypre_error_flag;
      }
 
@@ -569,7 +584,7 @@ TestBoomerAMGSolve( void               *amg_vdata,
       && (simple < 0 || simple >= num_levels) )
       {
         // printf("Rank %d about to call TestBoomerAMGCycle(), cycle_count = %d, max_iter = %d\n", my_id, cycle_count, max_iter);
-         TestBoomerAMGCycle(amg_data, F_array, U_array, relax_marker, proc, Q_array); 
+         hypre_TestBoomerAMGCycle(amg_data, F_array, U_array, relax_marker, proc, Q_array); 
       }
       else
          hypre_BoomerAMGAdditiveCycle(amg_data); 
@@ -709,7 +724,6 @@ TestBoomerAMGSolve( void               *amg_vdata,
       hypre_TFree(num_coeffs, HYPRE_MEMORY_HOST);
       hypre_TFree(num_variables, HYPRE_MEMORY_HOST);
    }
-   HYPRE_ANNOTATION_END("BoomerAMG.solve");
    
 
 
@@ -735,7 +749,7 @@ TestBoomerAMGSolve( void               *amg_vdata,
  *--------------------------------------------------------------------------*/
 
 HYPRE_Int
-TestBoomerAMGCycle( void              *amg_vdata,
+hypre_TestBoomerAMGCycle( void              *amg_vdata,
                    hypre_ParVector  **F_array,
                    hypre_ParVector  **U_array,
                    hypre_ParVector  **relax_marker,
@@ -1526,7 +1540,7 @@ TestBoomerAMGCycle( void              *amg_vdata,
 
 
 HYPRE_Int
-TestCompGrids1(hypre_AMGDDCompGrid **compGrid, HYPRE_Int num_levels, HYPRE_Int *padding, HYPRE_Int num_ghost_layers, HYPRE_Int current_level, HYPRE_Int check_ghost_info)
+hypre_BoomerAMGDD_TestCompGrids1(hypre_AMGDDCompGrid **compGrid, HYPRE_Int num_levels, HYPRE_Int *padding, HYPRE_Int num_ghost_layers, HYPRE_Int current_level, HYPRE_Int check_ghost_info)
 {
    // TEST 1: See whether the parallel composite grid algorithm algorithm has constructed a composite grid with 
    // the same shape (and ghost node info) as we expect from serial, top-down composite grid generation
@@ -1642,7 +1656,7 @@ TestCompGrids1(hypre_AMGDDCompGrid **compGrid, HYPRE_Int num_levels, HYPRE_Int *
 }
 
 HYPRE_Int
-TestCompGrids2(hypre_ParAMGDDData *amgdd_data)
+hypre_BoomerAMGDD_TestCompGrids2(hypre_ParAMGDDData *amgdd_data)
 {
    // TEST 2: See whether the dofs in the composite grid have the correct info.
    // Each processor in turn will broadcast out the info associate with its composite grids on each level.

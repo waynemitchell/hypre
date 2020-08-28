@@ -262,6 +262,9 @@ hypre_BoomerAMGCreate()
    hypre_BoomerAMGSetMinCoarseSize(amg_data, min_coarse_size);
    hypre_BoomerAMGSetCoarsenCutFactor(amg_data, coarsen_cut_factor);
    hypre_BoomerAMGSetStrongThreshold(amg_data, strong_threshold);
+#ifdef EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+   hypre_ParAMGDataVariableStrongThreshold(amg_data) = NULL;
+#endif
    hypre_BoomerAMGSetStrongThresholdR(amg_data, strong_threshold_R);
    hypre_BoomerAMGSetFilterThresholdR(amg_data, filter_threshold_R);
    hypre_BoomerAMGSetSabs(amg_data, Sabs);

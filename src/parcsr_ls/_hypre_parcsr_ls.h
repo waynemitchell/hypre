@@ -28,6 +28,8 @@ typedef struct { HYPRE_Int prev; HYPRE_Int next; } Link;
 
 #define CUMNUMIT
 
+#define EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+
 #include "par_csr_block_matrix.h"
 
 /*--------------------------------------------------------------------------
@@ -41,6 +43,9 @@ typedef struct
    /* setup params */
    HYPRE_Int      max_levels;
    HYPRE_Real     strong_threshold;
+#ifdef EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+   HYPRE_Real     *variable_strong_threshold;
+#endif
    HYPRE_Int      coarsen_cut_factor;
    HYPRE_Real     strong_thresholdR; /* theta for build R: defines strong F neighbors */
    HYPRE_Real     filter_thresholdR; /* theta for filtering R  */
@@ -287,6 +292,9 @@ typedef struct
 #define hypre_ParAMGDataMaxLevels(amg_data)            ((amg_data) -> max_levels)
 #define hypre_ParAMGDataCoarsenCutFactor(amg_data)     ((amg_data) -> coarsen_cut_factor)
 #define hypre_ParAMGDataStrongThreshold(amg_data)      ((amg_data) -> strong_threshold)
+#ifdef EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+#define hypre_ParAMGDataVariableStrongThreshold(amg_data)      ((amg_data) -> variable_strong_threshold)
+#endif
 #define hypre_ParAMGDataStrongThresholdR(amg_data)     ((amg_data) -> strong_thresholdR)
 #define hypre_ParAMGDataFilterThresholdR(amg_data)     ((amg_data) -> filter_thresholdR)
 #define hypre_ParAMGDataSabs(amg_data)                 ((amg_data) -> Sabs)
@@ -2276,6 +2284,13 @@ HYPRE_Int hypre_BoomerAMGDD_FAC_Jacobi( void *amgdd_vdata, HYPRE_Int level, HYPR
 HYPRE_Int hypre_BoomerAMGDD_FAC_GaussSeidel( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
 HYPRE_Int hypre_BoomerAMGDD_FAC_CFL1Jacobi( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
 HYPRE_Int hypre_BoomerAMGDD_FAC_OrderedGaussSeidel( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
+HYPRE_Int hypre_BoomerAMGDD_FAC_Cycle(void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int first_iteration);
+HYPRE_Int hypre_BoomerAMGDD_FAC_FCycle(void *amgdd_vdata, HYPRE_Int first_iteration);
+HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amgdd_vdata);
+HYPRE_Int hypre_BoomerAMGDD_FAC_Interpolate( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c );
+HYPRE_Int hypre_BoomerAMGDD_FAC_Restrict( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, HYPRE_Int first_iteration );
+HYPRE_Int hypre_BoomerAMGDD_FAC_Relax( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
+HYPRE_Int hypre_BoomerAMGDD_FAC_CFL1Jacobi_cpu( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int relax_set );
 
 /* par_amgdd_fac_cycles_device.c */
 HYPRE_Int hypre_BoomerAMGDD_FAC_Jacobi_device( void *amgdd_vdata, HYPRE_Int level );
@@ -2323,6 +2338,10 @@ HYPRE_Int hypre_BoomerAMGDD_UnpackSendFlagBuffer(hypre_AMGDDCompGrid **compGrid,
 HYPRE_Int hypre_BoomerAMGDD_CommunicateRemainingMatrixInfo(hypre_ParAMGDDData* amgdd_data);
 HYPRE_Int hypre_BoomerAMGDD_FixUpRecvMaps(hypre_AMGDDCompGrid **compGrid, hypre_AMGDDCommPkg *compGridCommPkg, HYPRE_Int ****recv_redundant_marker, HYPRE_Int start_level, HYPRE_Int num_levels);
 
+/* par_amgdd_test.c */
+HYPRE_Int hypre_BoomerAMGDDTestSolve(void *amgdd_vdata, hypre_ParCSRMatrix *A, hypre_ParVector *f, hypre_ParVector *u);
+HYPRE_Int hypre_BoomerAMGDD_TestCompGrids1(hypre_AMGDDCompGrid **compGrid, HYPRE_Int num_levels, HYPRE_Int *padding, HYPRE_Int num_ghost_layers, HYPRE_Int current_level, HYPRE_Int check_ghost_info);
+HYPRE_Int hypre_BoomerAMGDD_TestCompGrids2(hypre_ParAMGDDData *amgdd_data);
 
 #ifdef __cplusplus
 }
