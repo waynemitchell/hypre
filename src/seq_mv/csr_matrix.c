@@ -158,7 +158,7 @@ hypre_CSRMatrixResize( hypre_CSRMatrix *matrix, HYPRE_Int new_num_rows, HYPRE_In
   
    if (!hypre_CSRMatrixOwnsData(matrix))
    {
-      hypre_printf("Error: called hypre_CSRMatrixResize on a matrix that doesn't own the data\n");
+      hypre_error_w_msg(HYPRE_ERROR_GENERIC,"Error: called hypre_CSRMatrixResize on a matrix that doesn't own the data\n");
       return 1;
    }
    hypre_CSRMatrixNumCols(matrix) = new_num_cols;

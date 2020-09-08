@@ -454,6 +454,7 @@ hypre_ExchangeExternalRowsDeviceInit( hypre_CSRMatrix      *B_ext,
    hypre_TFree(B_ext_rownnz_d, HYPRE_MEMORY_DEVICE);
    hypre_TFree(B_ext_rownnz_h, HYPRE_MEMORY_HOST);
    hypre_TFree(B_ext_i_h,      HYPRE_MEMORY_HOST);
+   hypre_TFree(B_int_i_h,      HYPRE_MEMORY_HOST);
 
    hypre_TFree(hypre_ParCSRCommPkgSendMapStarts(comm_pkg_j), HYPRE_MEMORY_HOST);
    hypre_TFree(hypre_ParCSRCommPkgRecvVecStarts(comm_pkg_j), HYPRE_MEMORY_HOST);
@@ -580,6 +581,7 @@ struct FFFC_pred : public thrust::unary_function<Tuple, bool>
    }
 };
 
+/* AFF contains the diagonal of F-F block of A */
 HYPRE_Int
 hypre_ParCSRMatrixGenerateFFFCDevice( hypre_ParCSRMatrix  *A,
                                       HYPRE_Int           *CF_marker_host,
