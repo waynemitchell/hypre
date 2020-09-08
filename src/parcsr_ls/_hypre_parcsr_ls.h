@@ -2347,6 +2347,11 @@ HYPRE_Int hypre_BoomerAMGDD_UnpackSendFlagBuffer ( hypre_AMGDDCompGrid **compGri
 HYPRE_Int hypre_BoomerAMGDD_CommunicateRemainingMatrixInfo ( hypre_ParAMGDDData* amgdd_data );
 HYPRE_Int hypre_BoomerAMGDD_FixUpRecvMaps ( hypre_AMGDDCompGrid **compGrid, hypre_AMGDDCommPkg *compGridCommPkg, HYPRE_Int start_level, HYPRE_Int num_levels );
 
+/* par_amgdd_test.c */
+HYPRE_Int hypre_BoomerAMGDDTestSolve ( void *amgdd_vdata, hypre_ParCSRMatrix *A, hypre_ParVector *f, hypre_ParVector *u );
+HYPRE_Int hypre_BoomerAMGDD_TestCompGrids1 ( hypre_AMGDDCompGrid **compGrid, HYPRE_Int num_levels, HYPRE_Int *padding, HYPRE_Int num_ghost_layers, HYPRE_Int current_level, HYPRE_Int check_ghost_info );
+HYPRE_Int hypre_BoomerAMGDD_TestCompGrids2 ( hypre_ParAMGDDData *amgdd_data );
+
 #ifdef __cplusplus
 }
 #endif

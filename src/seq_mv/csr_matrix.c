@@ -490,10 +490,6 @@ hypre_CSRMatrixPrint( hypre_CSRMatrix *matrix,
    return ierr;
 }
 
-
-/*--------------------------------------------------------------------------
- * hypre_CSRMatrixPrintCOO: print a CSRMatrix in coordinate format
- *--------------------------------------------------------------------------*/
 HYPRE_Int
 hypre_CSRMatrixPrintMM( hypre_CSRMatrix *matrix,
                         HYPRE_Int        basei,

@@ -290,26 +290,14 @@ hypre_ParVectorPrint( hypre_ParVector  *vector,
 
    hypre_MPI_Comm_rank(comm,&my_id);
    hypre_MPI_Comm_size(comm,&num_procs);
-   // !!! Debug
-   /* printf("1 vector = %p\n", vector); */
-   /* printf("1 partitioning = %p, partitioning[0] = %d\n", partitioning, partitioning[0]); */
-   /* printf("new_file_name = %p, file_name = %p\n", new_file_name, file_name); */
    hypre_sprintf(new_file_name,"%s.%d",file_name,my_id);
-
-   // !!! Debug
-   /* printf("2 vector = %p\n", vector); */
-   /* printf("2 partitioning = %p\n", partitioning); */
-   /* printf("2 partitioning = %p, partitioning[0] = %d\n", partitioning, partitioning[0]); */
    hypre_SeqVectorPrint(local_vector,new_file_name);
-
    hypre_sprintf(new_file_name,"%s.INFO.%d",file_name,my_id);
    fp = fopen(new_file_name, "w");
    hypre_fprintf(fp, "%b\n", global_size);
 #ifdef HYPRE_NO_GLOBAL_PARTITION
    for (i=0; i < 2; i++)
-   {
       hypre_fprintf(fp, "%b\n", partitioning[i]);
-   }
 #else
    for (i=0; i < num_procs; i++)
       hypre_fprintf(fp, "%b\n", partitioning[i]);
