@@ -17,6 +17,13 @@ cat > $INTERNAL_HEADER <<@
 #ifndef hypre_PARCSR_LS_HEADER
 #define hypre_PARCSR_LS_HEADER
 
+
+/* macros for experimental features */
+#define AMGDD_FAC_TWO_LEVEL
+#define EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+#define AMGDD_TESTS
+
+
 #include <HYPRE_config.h>
 #include "HYPRE_parcsr_ls.h"
 #include "_hypre_parcsr_mv.h"

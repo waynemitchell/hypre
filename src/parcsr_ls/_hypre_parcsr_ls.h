@@ -4,6 +4,13 @@
 #ifndef hypre_PARCSR_LS_HEADER
 #define hypre_PARCSR_LS_HEADER
 
+
+/* macros for experimental features */
+#define AMGDD_FAC_TWO_LEVEL
+#define EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
+#define AMGDD_TESTS
+
+
 #include <HYPRE_config.h>
 #include "HYPRE_parcsr_ls.h"
 #include "_hypre_parcsr_mv.h"
@@ -762,6 +769,10 @@ typedef struct
    hypre_ParVector          *Ztemp;
 
    HYPRE_Int       (*amgddUserFACRelaxation)( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
+
+#ifdef AMGDD_TESTS
+   HYPRE_Int                 run_amgdd_tests;
+#endif
 } hypre_ParAMGDDData;
 
 /*--------------------------------------------------------------------------
@@ -780,6 +791,9 @@ typedef struct
 #define hypre_ParAMGDDDataCommPkg(amgdd_data)           ((amgdd_data)->amgdd_comm_pkg)
 #define hypre_ParAMGDDDataZtemp(amg_data)               ((amgdd_data)->Ztemp)
 #define hypre_ParAMGDDDataUserFACRelaxation(amgdd_data) ((amgdd_data)->amgddUserFACRelaxation)
+#ifdef AMGDD_TESTS
+#define hypre_ParAMGDDDataRunTests(amgdd_data)          ((amgdd_data)->run_amgdd_tests)
+#endif
 
 #endif
 /******************************************************************************
@@ -2289,6 +2303,9 @@ HYPRE_Int hypre_BoomerAMGDDSetup ( void *amgdd_vdata, hypre_ParCSRMatrix *A, hyp
 HYPRE_Int hypre_BoomerAMGDD_FAC ( void *amgdd_vdata, HYPRE_Int first_iteration );
 HYPRE_Int hypre_BoomerAMGDD_FAC_Cycle ( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_type, HYPRE_Int first_iteration );
 HYPRE_Int hypre_BoomerAMGDD_FAC_FCycle ( void *amgdd_vdata, HYPRE_Int first_iteration );
+#ifdef AMGDD_FAC_TWO_LEVEL
+HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel ( void *amgdd_vdata );
+#endif
 HYPRE_Int hypre_BoomerAMGDD_FAC_Interpolate ( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c );
 HYPRE_Int hypre_BoomerAMGDD_FAC_Restrict ( hypre_AMGDDCompGrid *compGrid_f, hypre_AMGDDCompGrid *compGrid_c, HYPRE_Int first_iteration );
 HYPRE_Int hypre_BoomerAMGDD_FAC_Relax ( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
@@ -2347,10 +2364,13 @@ HYPRE_Int hypre_BoomerAMGDD_UnpackSendFlagBuffer ( hypre_AMGDDCompGrid **compGri
 HYPRE_Int hypre_BoomerAMGDD_CommunicateRemainingMatrixInfo ( hypre_ParAMGDDData* amgdd_data );
 HYPRE_Int hypre_BoomerAMGDD_FixUpRecvMaps ( hypre_AMGDDCompGrid **compGrid, hypre_AMGDDCommPkg *compGridCommPkg, HYPRE_Int start_level, HYPRE_Int num_levels );
 
+#ifdef AMGDD_TESTS
 /* par_amgdd_test.c */
 HYPRE_Int hypre_BoomerAMGDDTestSolve ( void *amgdd_vdata, hypre_ParCSRMatrix *A, hypre_ParVector *f, hypre_ParVector *u );
 HYPRE_Int hypre_BoomerAMGDD_TestCompGrids1 ( hypre_AMGDDCompGrid **compGrid, HYPRE_Int num_levels, HYPRE_Int *padding, HYPRE_Int num_ghost_layers, HYPRE_Int current_level, HYPRE_Int check_ghost_info );
 HYPRE_Int hypre_BoomerAMGDD_TestCompGrids2 ( hypre_ParAMGDDData *amgdd_data );
+HYPRE_Int hypre_BoomerAMGDD_CheckCompGridCommPkg ( hypre_AMGDDCommPkg *compGridCommPkg );
+#endif
 
 #ifdef __cplusplus
 }

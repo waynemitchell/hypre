@@ -31,6 +31,10 @@ typedef struct
    hypre_ParVector          *Ztemp;
 
    HYPRE_Int       (*amgddUserFACRelaxation)( void *amgdd_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
+
+#ifdef AMGDD_TESTS
+   HYPRE_Int                 run_amgdd_tests;
+#endif
 } hypre_ParAMGDDData;
 
 /*--------------------------------------------------------------------------
@@ -49,5 +53,8 @@ typedef struct
 #define hypre_ParAMGDDDataCommPkg(amgdd_data)           ((amgdd_data)->amgdd_comm_pkg)
 #define hypre_ParAMGDDDataZtemp(amg_data)               ((amgdd_data)->Ztemp)
 #define hypre_ParAMGDDDataUserFACRelaxation(amgdd_data) ((amgdd_data)->amgddUserFACRelaxation)
+#ifdef AMGDD_TESTS
+#define hypre_ParAMGDDDataRunTests(amgdd_data)          ((amgdd_data)->run_amgdd_tests)
+#endif
 
 #endif

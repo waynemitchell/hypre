@@ -59,6 +59,7 @@ set(SRCS
   par_amgdd_helpers.c
   par_amgdd_fac_cycle.c
   par_amgdd_setup.c
+  par_amgdd_test.c
   par_amg_setup.c
   par_amg_solve.c
   par_amg_solveT.c

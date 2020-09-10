@@ -296,6 +296,20 @@ hypre_BoomerAMGDDSetup( void               *amgdd_vdata,
          hypre_TFree(recv_map_send_buffer, HYPRE_MEMORY_HOST);
          hypre_TFree(recv_map_send_buffer_size, HYPRE_MEMORY_HOST);
       }
+
+#ifdef AMGDD_TESTS
+      if (hypre_ParAMGDDDataRunTests(amgdd_data))
+      {
+         HYPRE_Int error_code;
+         HYPRE_Int myid;
+         hypre_MPI_Comm_rank(comm, &myid);
+         error_code = hypre_BoomerAMGDD_TestCompGrids1(compGrid, num_levels, padding, num_ghost_layers, level, 1);
+         if (error_code)
+            hypre_printf("TestCompGrids1 failed! Rank %d, level %d\n", myid, level);
+         else
+            hypre_printf("TestCompGrids1 passed! Rank %d, level %d\n", myid, level);
+      }
+#endif
    }
 
    /////////////////////////////////////////////////////////////////
@@ -306,8 +320,38 @@ hypre_BoomerAMGDDSetup( void               *amgdd_vdata,
 
    hypre_BoomerAMGDD_FixUpRecvMaps(compGrid, compGridCommPkg, amgdd_start_level, num_levels);
 
+#ifdef AMGDD_TESTS
+   HYPRE_Int test_failed = 0;
+   HYPRE_Int error_code;
+   if (hypre_ParAMGDDDataRunTests(amgdd_data))
+   {
+      // Test whether comp grids have correct shape
+      error_code = hypre_BoomerAMGDD_TestCompGrids1(compGrid, num_levels, padding, num_ghost_layers, 0, 1);
+      if (error_code)
+      {
+         hypre_printf("TestCompGrids1 failed!\n");
+         test_failed = 1;
+      }
+      else hypre_printf("TestCompGrids1 success\n");
+      hypre_BoomerAMGDD_CheckCompGridCommPkg(compGridCommPkg);
+   }
+#endif
+
    // Communicate data for A and all info for P
    hypre_BoomerAMGDD_CommunicateRemainingMatrixInfo(amgdd_data);
+
+#ifdef AMGDD_TESTS
+   if (hypre_ParAMGDDDataRunTests(amgdd_data))
+   {
+      error_code = hypre_BoomerAMGDD_TestCompGrids2(amgdd_data); // NOTE: test should come before setting up local indices for P (uses global col ind for P)
+      if (error_code)
+      {
+         hypre_printf("TestCompGrids2New failed!\n");
+         test_failed = 1;
+      }
+      else hypre_printf("TestCompGrids2New success\n");
+   }
+#endif
 
    // Setup the local indices for P
    hypre_AMGDDCompGridSetupLocalIndicesP(amgdd_data);
@@ -324,5 +368,12 @@ hypre_BoomerAMGDDSetup( void               *amgdd_vdata,
    hypre_TFree(requests, HYPRE_MEMORY_HOST);
    hypre_TFree(status, HYPRE_MEMORY_HOST);
 
+#ifdef AMGDD_TESTS
+   if (hypre_ParAMGDDDataRunTests(amgdd_data))
+      return test_failed;
+   else 
+      return hypre_error_flag;
+#else
    return hypre_error_flag;
+#endif
 }

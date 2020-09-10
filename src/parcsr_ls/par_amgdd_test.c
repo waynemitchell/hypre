@@ -7,6 +7,7 @@
 
 #include "_hypre_parcsr_ls.h"
 
+#ifdef AMGDD_TESTS
 
 HYPRE_Int SetRelaxMarker(hypre_AMGDDCompGrid *compGrid, hypre_ParVector *relax_marker, HYPRE_Int proc);
 
@@ -41,12 +42,6 @@ hypre_BoomerAMGDDTestSolve( void      *amgdd_vdata,
    hypre_MPI_Comm_size(hypre_MPI_COMM_WORLD, &num_procs);
 
    HYPRE_Int proc, level;
-
-   #if DEBUGGING_MESSAGES
-   hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-   if (myid == 0) hypre_printf("Began AMG-DD test solve on all ranks\n");
-   hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-   #endif
 
    // Get AMG info
    hypre_ParAMGDDData *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
@@ -99,13 +94,6 @@ hypre_BoomerAMGDDTestSolve( void      *amgdd_vdata,
    // Loop over processors
    for (proc = 0; proc < num_procs; proc++)
    {
-      #if DEBUGGING_MESSAGES
-      hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-      if (myid == 0) hypre_printf("About to set relax marker on all ranks for proc %d\n", proc);
-      hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-      #endif
-
-
       // Setup vectors on each level that dictate where relaxation should be suppressed
       hypre_ParVector  **relax_marker = hypre_CTAlloc(hypre_ParVector*, num_levels, HYPRE_MEMORY_HOST);
       for (level = 0; level < num_levels; level++)
@@ -119,12 +107,6 @@ hypre_BoomerAMGDDTestSolve( void      *amgdd_vdata,
          else hypre_ParVectorSetConstantValues(relax_marker[level], 1.0);
       }
 
-      #if DEBUGGING_MESSAGES
-      hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-      if (myid == 0) hypre_printf("Done setting relax marker on all ranks for proc %d\n", proc);
-      hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-      #endif
-
       // Set the initial guess for the AMG solve to 0
       hypre_ParVectorSetConstantValues(U_comp,0);
 
@@ -137,38 +119,11 @@ hypre_BoomerAMGDDTestSolve( void      *amgdd_vdata,
       }
 
       // Perform AMG solve with suppressed relaxation
-      #if MEASURE_TEST_COMP_RES
-      HYPRE_Real *res_norm = hypre_CTAlloc(HYPRE_Real, num_comp_cycles+1, HYPRE_MEMORY_HOST);
-      res_norm[0] = GetTestCompositeResidual(A, U_comp, res, hypre_ParVectorLocalVector(relax_marker[0]), proc);
-      #endif
       HYPRE_Int i;
       for (i = 0; i < num_comp_cycles; i++)
       {
          hypre_TestBoomerAMGSolve(amg_data, A, res, U_comp, relax_marker, proc, Q_array);
-
-
-         #if MEASURE_TEST_COMP_RES
-         res_norm[i+1] = GetTestCompositeResidual(A, U_comp, res, hypre_ParVectorLocalVector(relax_marker[0]), proc);
-         #endif
       }
-
-      #if DEBUGGING_MESSAGES
-      hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-      if (myid == 0) hypre_printf("Done with TestBoomerAMGSolve on all ranks for proc %d\n", proc);
-      hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-      #endif
-
-      #if MEASURE_TEST_COMP_RES
-      if (myid == 0)
-      {
-         FILE *file;
-         char filename[256];
-         sprintf(filename, "outputs/test_comp_res_proc%d.txt", proc);
-         file = fopen(filename, "w");
-         for (i = 0; i < num_comp_cycles+1; i++) fprintf(file, "%e ", res_norm[i]);
-         fprintf(file, "\n");
-      }
-      #endif
 
       // Update global solution
       /* if (hypre_ParAMGDDDataUseRD(amg_data)) */
@@ -289,37 +244,6 @@ SetRelaxMarker(hypre_AMGDDCompGrid *compGrid, hypre_ParVector *relax_marker, HYP
    return 0;
 }
 
-HYPRE_Real
-GetTestCompositeResidual(hypre_ParCSRMatrix *A, hypre_ParVector *U_comp, hypre_ParVector *res, hypre_Vector *relax_marker, HYPRE_Int proc)
-{
-
-   HYPRE_Int myid;
-   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid);
-
-   hypre_ParVector *intermediate_res = hypre_ParVectorCreate(hypre_MPI_COMM_WORLD, hypre_ParVectorGlobalSize(res), hypre_ParVectorPartitioning(res));
-   hypre_ParVectorInitialize(intermediate_res);
-
-   // Do the residual calculation in parallel
-   hypre_ParVectorCopy(res, intermediate_res);
-   hypre_ParCSRMatrixMatvec(-1.0, A, U_comp, 1.0, intermediate_res );
-   hypre_Vector *local_res = hypre_ParVectorLocalVector(intermediate_res);
-
-   // Locally find the residual norm counting only real nodes, then reduce over processors to get overall res norm
-   HYPRE_Real local_res_norm = 0;
-   HYPRE_Int i;
-   for (i = 0; i < hypre_VectorSize(local_res); i++)
-   {
-      if (hypre_VectorData(relax_marker)[i]) local_res_norm += hypre_VectorData(local_res)[i]*hypre_VectorData(local_res)[i];
-   }
-   HYPRE_Real res_norm = 0;
-   MPI_Reduce(&local_res_norm, &res_norm, 1, HYPRE_MPI_REAL, MPI_SUM, 0, hypre_MPI_COMM_WORLD);
-
-   hypre_ParVectorSetPartitioningOwner(intermediate_res, 0);
-   hypre_ParVectorDestroy(intermediate_res);
-
-   return sqrt(res_norm);
-}
-
 /*--------------------------------------------------------------------
  * TestBoomerAMGSolve
  *--------------------------------------------------------------------*/
@@ -335,25 +259,6 @@ hypre_TestBoomerAMGSolve( void               *amg_vdata,
 {
 
    MPI_Comm          comm = hypre_ParCSRMatrixComm(A);   
-
-
-
-
-
-
-    #if DEBUGGING_MESSAGES
-   HYPRE_Int myid;
-   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid);
-    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-    if (myid == 0) hypre_printf("Inside TestBoomerAMGSolve on all ranks, comm = %d\n", comm);
-    if (myid == 0) hypre_printf("comm world = %d\n", hypre_MPI_COMM_WORLD);
-    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-    #endif
-
-
-
-
-
 
    hypre_ParAMGData   *amg_data = (hypre_ParAMGData*) amg_vdata;
 
@@ -411,26 +316,6 @@ hypre_TestBoomerAMGSolve( void               *amg_vdata,
 
    hypre_MPI_Comm_size(comm, &num_procs);   
    hypre_MPI_Comm_rank(comm,&my_id);
-
-
-
-
-
-
-    #if DEBUGGING_MESSAGES
-    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-    if (myid == 0) hypre_printf("Past the first comm size call\n");
-    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-    #endif
-
-
-
-
-
-
-
-
-
 
    amg_print_level    = hypre_ParAMGDataPrintLevel(amg_data);
    amg_logging      = hypre_ParAMGDataLogging(amg_data);
@@ -725,22 +610,6 @@ hypre_TestBoomerAMGSolve( void               *amg_vdata,
       hypre_TFree(num_variables, HYPRE_MEMORY_HOST);
    }
    
-
-
-
-
-    #if DEBUGGING_MESSAGES
-    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-    if (myid == 0) hypre_printf("Finished with TestBoomerAMGSolve on all ranks\n");
-    hypre_MPI_Barrier(hypre_MPI_COMM_WORLD);
-    #endif
-
-
-
-
-
-
-
    return hypre_error_flag;
 }
 
@@ -2199,7 +2068,7 @@ hypre_BoomerAMGDD_TestCompGrids2(hypre_ParAMGDDData *amgdd_data)
 }
 
 HYPRE_Int 
-CheckCompGridCommPkg(hypre_AMGDDCommPkg *compGridCommPkg)
+hypre_BoomerAMGDD_CheckCompGridCommPkg(hypre_AMGDDCommPkg *compGridCommPkg)
 {
    HYPRE_Int myid;
    hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid);
@@ -2266,4 +2135,4 @@ CheckCompGridCommPkg(hypre_AMGDDCommPkg *compGridCommPkg)
    return 0;
 }
 
-
+#endif

@@ -22,6 +22,12 @@ hypre_BoomerAMGDD_FAC( void *amgdd_vdata, HYPRE_Int first_iteration )
    {
       hypre_BoomerAMGDD_FAC_FCycle(amgdd_vdata, first_iteration);
    }
+#ifdef AMGDD_FAC_TWO_LEVEL
+   else if (cycle_type == 4)
+   {
+      hypre_BoomerAMGDD_FAC_TwoLevel(amgdd_vdata);
+   }
+#endif
    else
    {
       hypre_error_w_msg(HYPRE_ERROR_GENERIC, "WARNING: unknown AMG-DD FAC cycle type. Defaulting to 1 (V-cycle).\n");
@@ -691,3 +697,47 @@ hypre_BoomerAMGDD_FAC_CFL1JacobiHost( void      *amgdd_vdata,
 
    return hypre_error_flag;
 }
+
+
+#ifdef AMGDD_FAC_TWO_LEVEL
+HYPRE_Int hypre_BoomerAMGDD_FAC_TwoLevel(void *amgdd_vdata)
+{
+   HYPRE_Int   myid, num_procs;
+   hypre_MPI_Comm_rank(hypre_MPI_COMM_WORLD, &myid );
+   hypre_MPI_Comm_size(hypre_MPI_COMM_WORLD, &num_procs );
+
+   HYPRE_Int i;
+
+   // Get the AMG structure
+   hypre_ParAMGDDData   *amgdd_data = (hypre_ParAMGDDData*) amgdd_vdata;
+   hypre_AMGDDCompGrid **compGrid   = hypre_ParAMGDDDataCompGrid(amgdd_data);
+
+   // Relax on fine grid
+   hypre_BoomerAMGDD_FAC_Relax(amgdd_data, 0, 1);
+
+   // Restrict
+   hypre_BoomerAMGDD_FAC_Restrict( compGrid[0], compGrid[1], 0 );
+   hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridS(compGrid[0]), 0.0 );
+   hypre_AMGDDCompGridVectorSetConstantValues( hypre_AMGDDCompGridT(compGrid[0]), 0.0 );
+
+   // Call many cycles on level 1 (approximate solve)
+   for (i = 0; i < 10; i++)
+   {
+      hypre_BoomerAMGDD_FAC_Cycle( amgdd_vdata, 1, 1, 0 );
+   }
+   // !!! Debug: report residual on level 1
+   hypre_AMGDDCompGridVector *tmp = hypre_AMGDDCompGridVectorCreate();
+   hypre_AMGDDCompGridVectorInitialize(tmp, hypre_AMGDDCompGridNumOwnedNodes(compGrid[1]), hypre_AMGDDCompGridNumNonOwnedNodes(compGrid[1]), hypre_AMGDDCompGridNumNonOwnedRealNodes(compGrid[1]));
+   hypre_AMGDDCompGridVectorCopy(hypre_AMGDDCompGridF(compGrid[1]), tmp);
+   hypre_AMGDDCompGridMatvec(-1.0, hypre_AMGDDCompGridA(compGrid[1]), hypre_AMGDDCompGridU(compGrid[1]), 1.0, tmp);
+   HYPRE_Real res_norm = sqrt( hypre_AMGDDCompGridVectorRealInnerProd(tmp, tmp) );
+   HYPRE_Real f_norm = sqrt( hypre_AMGDDCompGridVectorRealInnerProd(hypre_AMGDDCompGridF(compGrid[1]), hypre_AMGDDCompGridF(compGrid[1])) );
+   if (myid == 0) printf("   Level 1 res norm = %e, relative res norm = %e\n", res_norm, res_norm / f_norm);
+
+   // Interpolate and post relax
+   hypre_BoomerAMGDD_FAC_Interpolate( compGrid[0], compGrid[1] );
+   hypre_BoomerAMGDD_FAC_Relax(amgdd_data, 0, 2);
+
+   return 0;
+}
+#endif
