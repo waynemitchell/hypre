@@ -73,6 +73,9 @@ typedef struct
    HYPRE_Int      fcycle;
    HYPRE_Int      cycle_type;
    HYPRE_Int     *num_grid_sweeps;
+#ifdef AMG_USER_RELAX
+   HYPRE_Int    (*amgUserRelaxation)( void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
+#endif
    HYPRE_Int     *grid_relax_type;
    HYPRE_Int    **grid_relax_points;
    HYPRE_Int      relax_order;
@@ -326,6 +329,9 @@ typedef struct
 #define hypre_ParAMGDataUserRelaxType(amg_data) ((amg_data)->user_relax_type)
 #define hypre_ParAMGDataUserRelaxWeight(amg_data) ((amg_data)->user_relax_weight)
 #define hypre_ParAMGDataUserNumSweeps(amg_data) ((amg_data)->user_num_sweeps)
+#ifdef AMG_USER_RELAX
+#define hypre_ParAMGDataUserRelaxation(amg_data) ((amg_data)->amgUserRelaxation)
+#endif
 #define hypre_ParAMGDataGridRelaxType(amg_data) ((amg_data)->grid_relax_type)
 #define hypre_ParAMGDataGridRelaxPoints(amg_data) ((amg_data)->grid_relax_points)
 #define hypre_ParAMGDataRelaxOrder(amg_data) ((amg_data)->relax_order)

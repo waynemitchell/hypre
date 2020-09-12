@@ -360,6 +360,12 @@ hypre_BoomerAMGCycle( void              *amg_vdata,
 
             for (j = 0; j < num_sweep; j++)
             {
+#ifdef AMG_USER_RELAX
+               if (hypre_ParAMGDataUserRelaxation(amg_data) != NULL)
+               {
+                  (*hypre_ParAMGDataUserRelaxation(amg_data))(amg_vdata, level, cycle_param);
+               }
+#endif
                if (num_levels == 1 && max_levels > 1)
                {
                   relax_points = 0;

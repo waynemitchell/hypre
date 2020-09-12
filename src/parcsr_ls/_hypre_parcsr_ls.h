@@ -98,6 +98,9 @@ typedef struct
    HYPRE_Int      fcycle;
    HYPRE_Int      cycle_type;
    HYPRE_Int     *num_grid_sweeps;
+#ifdef AMG_USER_RELAX
+   HYPRE_Int    (*amgUserRelaxation)( void *amg_vdata, HYPRE_Int level, HYPRE_Int cycle_param );
+#endif
    HYPRE_Int     *grid_relax_type;
    HYPRE_Int    **grid_relax_points;
    HYPRE_Int      relax_order;
@@ -351,6 +354,9 @@ typedef struct
 #define hypre_ParAMGDataUserRelaxType(amg_data) ((amg_data)->user_relax_type)
 #define hypre_ParAMGDataUserRelaxWeight(amg_data) ((amg_data)->user_relax_weight)
 #define hypre_ParAMGDataUserNumSweeps(amg_data) ((amg_data)->user_num_sweeps)
+#ifdef AMG_USER_RELAX
+#define hypre_ParAMGDataUserRelaxation(amg_data) ((amg_data)->amgUserRelaxation)
+#endif
 #define hypre_ParAMGDataGridRelaxType(amg_data) ((amg_data)->grid_relax_type)
 #define hypre_ParAMGDataGridRelaxPoints(amg_data) ((amg_data)->grid_relax_points)
 #define hypre_ParAMGDataRelaxOrder(amg_data) ((amg_data)->relax_order)
@@ -2325,6 +2331,7 @@ hypre_AMGDDCompGridMatrix* hypre_AMGDDCompGridMatrixCreate();
 HYPRE_Int hypre_AMGDDCompGridMatrixDestroy ( hypre_AMGDDCompGridMatrix *matrix );
 HYPRE_Int hypre_AMGDDCompGridMatvec ( HYPRE_Complex alpha, hypre_AMGDDCompGridMatrix *A, hypre_AMGDDCompGridVector *x, HYPRE_Complex beta, hypre_AMGDDCompGridVector *y );
 HYPRE_Int hypre_AMGDDCompGridRealMatvec ( HYPRE_Complex alpha, hypre_AMGDDCompGridMatrix *A, hypre_AMGDDCompGridVector *x, HYPRE_Complex beta, hypre_AMGDDCompGridVector *y );
+HYPRE_Int hypre_AMGDDCompGridMatrixSetupRealMatvec( hypre_AMGDDCompGridMatrix *A );
 hypre_AMGDDCompGridVector* hypre_AMGDDCompGridVectorCreate();
 HYPRE_Int hypre_AMGDDCompGridVectorInitialize ( hypre_AMGDDCompGridVector *vector, HYPRE_Int num_owned, HYPRE_Int num_nonowned, HYPRE_Int num_real );
 HYPRE_Int hypre_AMGDDCompGridVectorDestroy ( hypre_AMGDDCompGridVector *vector );
