@@ -2575,6 +2575,10 @@ hypre_BoomerAMGIndepPMISa( hypre_ParCSRMatrix    *S,
 }
 HYPRE_Int
 hypre_BoomerAMGCoarsenCR( hypre_ParCSRMatrix    *A,
+#ifdef AMG_USER_RELAX
+                          hypre_ParAMGData  *amg_data,
+                          HYPRE_Int          level,
+#endif
                           HYPRE_Int        **CF_marker_ptr,
                           HYPRE_BigInt      *coarse_size_ptr,
                           HYPRE_Int          num_CR_relax_steps,
@@ -2640,24 +2644,29 @@ hypre_BoomerAMGCoarsenCR( hypre_ParCSRMatrix    *A,
 
    num_threads = hypre_NumThreads();
 
+   if (*CF_marker_ptr == NULL)
+   {
+      *CF_marker_ptr = hypre_CTAlloc(HYPRE_Int, num_variables, HYPRE_MEMORY_HOST);
+   }
+   CF_marker = *CF_marker_ptr;
 
    global_num_variables = hypre_ParCSRMatrixGlobalNumRows(A);
    /*if(CRaddCpoints == 0)
      {*/
-   if(num_functions == 1)
-   {
-      CF_marker = hypre_CTAlloc(HYPRE_Int,  num_variables, HYPRE_MEMORY_HOST);
-      for ( i = 0; i < num_variables; i++)
-         CF_marker[i] = fpt;
-   }
-   else
-   {
-      num_nodes = num_variables/num_functions;
-      CF_marker = hypre_CTAlloc(HYPRE_Int,  num_nodes, HYPRE_MEMORY_HOST);
-      sum = hypre_CTAlloc(HYPRE_Real,  num_nodes, HYPRE_MEMORY_HOST);
-      for ( i = 0; i < num_nodes; i++)
-         CF_marker[i] = fpt;
-   }
+   /* if(num_functions == 1) */
+   /* { */
+   /*    CF_marker = hypre_CTAlloc(HYPRE_Int,  num_variables, HYPRE_MEMORY_HOST); */
+   /*    for ( i = 0; i < num_variables; i++) */
+   /*       CF_marker[i] = fpt; */
+   /* } */
+   /* else */
+   /* { */
+   /*    num_nodes = num_variables/num_functions; */
+   /*    CF_marker = hypre_CTAlloc(HYPRE_Int,  num_nodes, HYPRE_MEMORY_HOST); */
+   /*    sum = hypre_CTAlloc(HYPRE_Real,  num_nodes, HYPRE_MEMORY_HOST); */
+   /*    for ( i = 0; i < num_nodes; i++) */
+   /*       CF_marker[i] = fpt; */
+   /* } */
    /*}
      else
      {
@@ -2809,6 +2818,18 @@ hypre_BoomerAMGCoarsenCR( hypre_ParCSRMatrix    *A,
          {
             for (j=0; j < num_variables; j++)
                if (CF_marker[j] == fpt) e0[j] = e1[j];
+
+#ifdef AMG_USER_RELAX
+            if (hypre_ParAMGDataUserRelax(amg_data) != NULL)
+            {
+               (*hypre_ParAMGDataUserRelax(amg_data))(A, Vtemp, CF_marker,
+                                 level, rlx_type, fpt,
+                                 relax_weight, omega, NULL,
+                                 e1_vec, e0_vec,
+                                 Relax_temp);
+            }
+            else
+#endif
             hypre_BoomerAMGRelax(A, Vtemp, CF_marker,
                                  rlx_type, fpt,
                                  relax_weight, omega, NULL,

@@ -271,7 +271,7 @@ HYPRE_Int
 hypre_ParVectorPrint( hypre_ParVector  *vector,
                       const char       *file_name )
 {
-   char          new_file_name[80];
+   char          new_file_name[1024];
    hypre_Vector *local_vector;
    MPI_Comm      comm;
    HYPRE_Int     my_id, num_procs, i;

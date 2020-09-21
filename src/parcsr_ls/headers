@@ -22,6 +22,7 @@ cat > $INTERNAL_HEADER <<@
 #define AMGDD_FAC_TWO_LEVEL
 #define EXPERIMENTAL_VARIABLE_STRONG_THRESHOLD
 #define AMGDD_TESTS
+#define AMG_USER_RELAX
 
 
 #include <HYPRE_config.h>

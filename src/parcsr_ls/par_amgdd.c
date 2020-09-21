@@ -35,6 +35,11 @@ hypre_BoomerAMGDDCreate()
    hypre_ParAMGDDDataCompGrid(amgdd_data)       = NULL;
    hypre_ParAMGDDDataUserFACRelaxation(amgdd_data) = hypre_BoomerAMGDD_FAC_CFL1Jacobi;
 
+#ifdef AMGDD_TESTS
+   hypre_ParAMGDDDataKeepGlobalIndices(amgdd_data) = 0;
+   hypre_ParAMGDDDataRunTests(amgdd_data) = 0;
+#endif
+
    return (void *) amgdd_data;
 }
 

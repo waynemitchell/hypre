@@ -322,7 +322,7 @@ hypre_BoomerAMGCreate()
    hypre_BoomerAMGSetTol(amg_data, tol);
    hypre_BoomerAMGSetNumSweeps(amg_data, num_sweeps);
 #ifdef AMG_USER_RELAX
-   hypre_ParAMGDataUserRelaxation(amg_data) = NULL;
+   hypre_ParAMGDataUserRelax(amg_data) = NULL;
 #endif
    hypre_BoomerAMGSetCycleRelaxType(amg_data, relax_down, 1);
    hypre_BoomerAMGSetCycleRelaxType(amg_data, relax_up, 2);

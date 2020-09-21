@@ -34,6 +34,7 @@ typedef struct
 
 #ifdef AMGDD_TESTS
    HYPRE_Int                 run_amgdd_tests;
+   HYPRE_Int                 keep_global_indices;
 #endif
 } hypre_ParAMGDDData;
 
@@ -55,6 +56,7 @@ typedef struct
 #define hypre_ParAMGDDDataUserFACRelaxation(amgdd_data) ((amgdd_data)->amgddUserFACRelaxation)
 #ifdef AMGDD_TESTS
 #define hypre_ParAMGDDDataRunTests(amgdd_data)          ((amgdd_data)->run_amgdd_tests)
+#define hypre_ParAMGDDDataKeepGlobalIndices(amgdd_data)          ((amgdd_data)->keep_global_indices)
 #endif
 
 #endif

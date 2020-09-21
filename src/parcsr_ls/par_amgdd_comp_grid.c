@@ -1476,37 +1476,39 @@ HYPRE_Int hypre_AMGDDCompGridFinalize( hypre_ParAMGDDData *amgdd_data )
          hypre_AMGDDCompGridVectorInitialize(hypre_AMGDDCompGridT(compGrid[level]), num_owned, num_nonowned, num_nonowned_real_nodes);
       }
 
+
       // Free up arrays we no longer need
-      if (hypre_AMGDDCompGridNonOwnedRealMarker(compGrid[level]))
+      hypre_TFree(hypre_AMGDDCompGridNonOwnedRealMarker(compGrid[level]), memory_location);
+      hypre_AMGDDCompGridNonOwnedRealMarker(compGrid[level]) = NULL;
+#ifdef AMGDD_TESTS
+      // If global indices are still needed, transform these also
+      if (hypre_ParAMGDDDataKeepGlobalIndices(amgdd_data) || hypre_ParAMGDDDataRunTests(amgdd_data))
       {
-         hypre_TFree(hypre_AMGDDCompGridNonOwnedRealMarker(compGrid[level]), memory_location);
-         hypre_AMGDDCompGridNonOwnedRealMarker(compGrid[level]) = NULL;
+         HYPRE_Int *new_global_indices = hypre_CTAlloc(HYPRE_Int, num_nonowned, hypre_AMGDDCompGridMemoryLocation(compGrid[level]));
+         for (i = 0; i < num_nonowned; i++)
+         {
+            new_global_indices[ new_indices[i] ] = hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level])[ i ];
+         }
+         hypre_TFree(hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level]), memory_location);
+         hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level]) = new_global_indices;
       }
-      if (hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level]))
+      else
       {
          hypre_TFree(hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level]), memory_location);
          hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level]) = NULL;
       }
-      if (hypre_AMGDDCompGridNonOwnedCoarseIndices(compGrid[level]))
-      {
-         hypre_TFree(hypre_AMGDDCompGridNonOwnedCoarseIndices(compGrid[level]), memory_location);
-         hypre_AMGDDCompGridNonOwnedCoarseIndices(compGrid[level]) = NULL;
-      }
-      if (hypre_AMGDDCompGridOwnedCoarseIndices(compGrid[level]))
-      {
-         hypre_TFree(hypre_AMGDDCompGridOwnedCoarseIndices(compGrid[level]), memory_location);
-         hypre_AMGDDCompGridOwnedCoarseIndices(compGrid[level]) = NULL;
-      }
-      if (hypre_AMGDDCompGridNonOwnedSort(compGrid[level]))
-      {
-         hypre_TFree(hypre_AMGDDCompGridNonOwnedSort(compGrid[level]), memory_location);
-         hypre_AMGDDCompGridNonOwnedSort(compGrid[level]) = NULL;
-      }
-      if (hypre_AMGDDCompGridNonOwnedInvSort(compGrid[level]))
-      {
-         hypre_TFree(hypre_AMGDDCompGridNonOwnedInvSort(compGrid[level]), memory_location);
-         hypre_AMGDDCompGridNonOwnedInvSort(compGrid[level]) = NULL;
-      }
+#else
+      hypre_TFree(hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level]), memory_location);
+      hypre_AMGDDCompGridNonOwnedGlobalIndices(compGrid[level]) = NULL;
+#endif
+      hypre_TFree(hypre_AMGDDCompGridNonOwnedCoarseIndices(compGrid[level]), memory_location);
+      hypre_AMGDDCompGridNonOwnedCoarseIndices(compGrid[level]) = NULL;
+      hypre_TFree(hypre_AMGDDCompGridOwnedCoarseIndices(compGrid[level]), memory_location);
+      hypre_AMGDDCompGridOwnedCoarseIndices(compGrid[level]) = NULL;
+      hypre_TFree(hypre_AMGDDCompGridNonOwnedSort(compGrid[level]), memory_location);
+      hypre_AMGDDCompGridNonOwnedSort(compGrid[level]) = NULL;
+      hypre_TFree(hypre_AMGDDCompGridNonOwnedInvSort(compGrid[level]), memory_location);
+      hypre_AMGDDCompGridNonOwnedInvSort(compGrid[level]) = NULL;
       hypre_TFree(new_indices, memory_location);
    }
 

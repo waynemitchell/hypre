@@ -1129,11 +1129,22 @@ hypre_BoomerAMGSetup( void               *amg_vdata,
                hypre_BoomerAMGCreateS(A_array[level],
                                       CR_strong_th, 1,
                                       num_functions, dof_func_array[level],&SCR);
+#ifdef AMG_USER_RELAX
+               hypre_BoomerAMGCoarsenCR(A_array[level], 
+                                        amg_data,
+                                        level, 
+                                        &CF_marker,
+                                        &coarse_size,
+                                        num_CR_relax_steps, IS_type, 1, grid_relax_type[0],
+                                        relax_weight[level], omega[level], CR_rate,
+                                        NULL,NULL,CR_use_CG,SCR);
+#else
                hypre_BoomerAMGCoarsenCR(A_array[level], &CF_marker,
                                         &coarse_size,
                                         num_CR_relax_steps, IS_type, 1, grid_relax_type[0],
                                         relax_weight[level], omega[level], CR_rate,
                                         NULL,NULL,CR_use_CG,SCR);
+#endif
                hypre_ParCSRMatrixDestroy(SCR);
             }
 #if DEBUG

@@ -1005,7 +1005,11 @@ HYPRE_Int hypre_BoomerAMGIndepHMIS ( hypre_ParCSRMatrix *S , HYPRE_Int measure_t
 HYPRE_Int hypre_BoomerAMGIndepHMISa ( hypre_ParCSRMatrix *S , HYPRE_Int measure_type , HYPRE_Int debug_flag , HYPRE_Int *CF_marker );
 HYPRE_Int hypre_BoomerAMGIndepPMIS ( hypre_ParCSRMatrix *S , HYPRE_Int CF_init , HYPRE_Int debug_flag , HYPRE_Int *CF_marker );
 HYPRE_Int hypre_BoomerAMGIndepPMISa ( hypre_ParCSRMatrix *S , HYPRE_Int CF_init , HYPRE_Int debug_flag , HYPRE_Int *CF_marker );
+#ifdef AMG_USER_RELAX
+HYPRE_Int hypre_BoomerAMGCoarsenCR ( hypre_ParCSRMatrix *A , hypre_ParAMGData *amg_data, HYPRE_Int level , HYPRE_Int **CF_marker_ptr , HYPRE_BigInt *coarse_size_ptr , HYPRE_Int num_CR_relax_steps , HYPRE_Int IS_type , HYPRE_Int num_functions , HYPRE_Int rlx_type , HYPRE_Real relax_weight , HYPRE_Real omega , HYPRE_Real theta , HYPRE_Solver smoother , hypre_ParCSRMatrix *AN , HYPRE_Int useCG , hypre_ParCSRMatrix *S );
+#else
 HYPRE_Int hypre_BoomerAMGCoarsenCR ( hypre_ParCSRMatrix *A , HYPRE_Int **CF_marker_ptr , HYPRE_BigInt *coarse_size_ptr , HYPRE_Int num_CR_relax_steps , HYPRE_Int IS_type , HYPRE_Int num_functions , HYPRE_Int rlx_type , HYPRE_Real relax_weight , HYPRE_Real omega , HYPRE_Real theta , HYPRE_Solver smoother , hypre_ParCSRMatrix *AN , HYPRE_Int useCG , hypre_ParCSRMatrix *S );
+#endif
 
 /* par_cycle.c */
 HYPRE_Int hypre_BoomerAMGCycle ( void *amg_vdata , hypre_ParVector **F_array , hypre_ParVector **U_array );

@@ -361,9 +361,20 @@ hypre_BoomerAMGCycle( void              *amg_vdata,
             for (j = 0; j < num_sweep; j++)
             {
 #ifdef AMG_USER_RELAX
-               if (hypre_ParAMGDataUserRelaxation(amg_data) != NULL)
+               if (hypre_ParAMGDataUserRelax(amg_data) != NULL)
                {
-                  (*hypre_ParAMGDataUserRelaxation(amg_data))(amg_vdata, level, cycle_param);
+                  Solve_err_flag = (*hypre_ParAMGDataUserRelax(amg_data))(A_array[level],
+                                                        Aux_F,
+                                                        CF_marker_array[level],
+                                                        level,
+                                                        relax_type,
+                                                        relax_points,
+                                                        relax_weight[level],
+                                                        omega[level],
+                                                        l1_norms_level ? hypre_VectorData(l1_norms_level) : NULL,
+                                                        Aux_U,
+                                                        Vtemp,
+                                                        Ztemp);
                }
 #endif
                if (num_levels == 1 && max_levels > 1)
